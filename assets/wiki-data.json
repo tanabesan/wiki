@@ -1,0 +1,49 @@
+{
+  "title": "LOLBeans Wiki(非公式)",
+  "repo": "tanabesan/lolwiki",
+  "branch": "main",
+  "pages": [
+    {
+      "slug": "game-overview",
+      "title": "ゲーム概要",
+      "category": "基本",
+      "summary": "LOLBeansとはどんなゲームか、基本ルールと遊び方。",
+      "keywords": ["概要", "ルール", "遊び方", "初心者"]
+    },
+    {
+      "slug": "stages",
+      "title": "ステージ一覧",
+      "category": "ステージ・モード",
+      "summary": "ステージごとのギミックと攻略ポイントの一覧。",
+      "keywords": ["マップ", "コース", "レベル", "ギミック"]
+    },
+    {
+      "slug": "modes",
+      "title": "ゲームモード",
+      "category": "ステージ・モード",
+      "summary": "モードごとのルールと勝利条件。",
+      "keywords": ["モード", "バトルロイヤル", "ルール"]
+    },
+    {
+      "slug": "skins",
+      "title": "スキン・コスメ",
+      "category": "コレクション",
+      "summary": "ビーンの見た目(スキンなど)の一覧と入手方法。",
+      "keywords": ["スキン", "見た目", "アイテム", "入手"]
+    },
+    {
+      "slug": "tips",
+      "title": "攻略Tips",
+      "category": "攻略",
+      "summary": "上達のためのコツや小技をまとめるページ。",
+      "keywords": ["コツ", "小技", "攻略", "上達"]
+    },
+    {
+      "slug": "glossary",
+      "title": "用語集",
+      "category": "基本",
+      "summary": "ゲーム内外で使われる用語の一覧。",
+      "keywords": ["単語", "用語", "辞書"]
+    }
+  ]
+}
