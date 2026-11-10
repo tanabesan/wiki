@@ -1,0 +1,14 @@
+.infobox {
+  float: right; width: 280px; margin: 0 0 16px 24px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  overflow: hidden; font-size: 0.9rem;
+}
+.infobox .ib-title { background: var(--accent); color: #fff; padding: 8px 12px; font-weight: 700; text-align: center; }
+.infobox .ib-img { background: var(--accent-soft); color: var(--muted); text-align: center; padding: 40px 0; font-size: 0.8rem; }
+.infobox img { display: block; width: 100%; }
+.infobox table { width: 100%; border-collapse: collapse; }
+.infobox th, .infobox td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.infobox th { width: 38%; color: var(--muted); font-weight: 500; }
+@media (max-width: 800px) {
+  .infobox { float: none; width: 100%; margin: 0 0 20px; }
+}
