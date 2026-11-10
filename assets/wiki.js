@@ -1,17 +1,24 @@
+<<<<<<< HEAD
 /*
  * Wiki コア: サイドバー・検索・Markdown表示・ブラウザ上の編集(GitHub連携)・プラグイン読み込み
  *
  * 記法(infobox / [[リンク]] / ||ネタバレ|| など)や目次・最近の更新などの機能は、
  * すべて plugins/ 以下のプラグインです。有効にするものは assets/wiki-data.json の "plugins" で決めます。
  */
+=======
+/* Wiki: サイドバー・検索・Markdown表示・ブラウザ上の編集(GitHub連携) */
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
 (function () {
   "use strict";
 
   var TOKEN_KEY = "wikiGithubToken";
   var FRESH_MS = 10 * 60 * 1000;
   var SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+<<<<<<< HEAD
   // wiki-data.json に "plugins" が無いときに使うプラグイン(以前は本体に入っていた3つの記法)
   var DEFAULT_PLUGINS = ["infobox", "wikilinks", "spoiler"];
+=======
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
   var NEW_TEMPLATE =
     "```infobox\n名前\n画像:\n項目1: 内容\n項目2: 内容\n```\n\n" +
     "ここに概要を書きます。\n\n## 見出し\n\n本文。他のページへのリンクは [[ページ名]] と書きます。\n";
@@ -49,6 +56,7 @@
     return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
   }
 
+<<<<<<< HEAD
   /* =====================================================================
    * プラグイン機構
    *
@@ -175,6 +183,50 @@
   function enhance(el, ctx) {
     el.querySelectorAll("table").forEach(function (t) { t.classList.add("data"); });
     runHook("html", function (h) { h(el, ctx); });
+=======
+  /* ---------- Markdown ---------- */
+  function preprocess(md) {
+    md = md.replace(/```infobox[ \t]*\r?\n([\s\S]*?)```/g, function (_, body) {
+      var lines = body.split(/\r?\n/).filter(function (l) { return l.trim() !== ""; });
+      if (!lines.length) return "";
+      var h = '<div class="infobox"><div class="ib-title">' + esc(lines[0].trim()) + "</div>";
+      var rows = "";
+      lines.slice(1).forEach(function (l) {
+        var m = l.match(/^\s*([^:：]+)[:：]\s*(.*)$/);
+        if (!m) return;
+        var k = m[1].trim(), v = m[2].trim();
+        if (k === "画像") {
+          h += v ? '<img src="' + esc(v) + '" alt="">' : '<div class="ib-img">画像</div>';
+        } else {
+          rows += "<tr><th>" + esc(k) + "</th><td>" + esc(v) + "</td></tr>";
+        }
+      });
+      if (rows) h += "<table>" + rows + "</table>";
+      return "\n\n" + h + "</div>\n\n";
+    });
+    md = md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, function (_, key, label) {
+      var p = findPage(key);
+      var text = (label || (p ? p.title : key)).trim();
+      return p
+        ? '<a href="' + href(p) + '">' + esc(text) + "</a>"
+        : '<span class="missing" title="未作成のページ">' + esc(text) + "</span>";
+    });
+    return md.replace(/\|\|([^|\n]+)\|\|/g, '<span class="spoiler">$1</span>');
+  }
+
+  // 本文のHTMLは必ずサニタイズする(編集者のトークン保護のため)。ライブラリが無ければ生テキスト表示。
+  function render(md) {
+    if (!window.marked || !window.DOMPurify) return "<pre>" + esc(md) + "</pre>";
+    return window.DOMPurify.sanitize(window.marked.parse(preprocess(md)));
+  }
+  function enhance(el) {
+    el.querySelectorAll("table").forEach(function (t) {
+      if (!t.closest(".infobox")) t.classList.add("data");
+    });
+    el.querySelectorAll(".spoiler").forEach(function (s) {
+      s.addEventListener("click", function () { s.classList.toggle("open"); });
+    });
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
   }
 
   /* ---------- GitHub API ---------- */
@@ -266,8 +318,12 @@
     if (!side) return;
     var html = '<p class="site-title"><a href="index.html">' + esc(cfg.title || "Wiki") + "</a></p>";
     html += '<div class="search"><input id="q" type="search" placeholder="ページを検索…" autocomplete="off">';
+<<<<<<< HEAD
     html += '<ul id="results" class="search-results"></ul></div>';
     html += '<div id="side-plugins" class="side-plugins"></div><nav class="nav">';
+=======
+    html += '<ul id="results" class="search-results"></ul></div><nav class="nav">';
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     var cats = [];
     pages.forEach(function (p) { if (cats.indexOf(p.category) < 0) cats.push(p.category); });
     cats.forEach(function (c) {
@@ -286,8 +342,11 @@
     }
     side.innerHTML = html;
 
+<<<<<<< HEAD
     runHook("sidebar", function (h) { h($("side-plugins")); });
 
+=======
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     var lo = $("logout");
     if (lo) lo.addEventListener("click", function (ev) { ev.preventDefault(); setToken(""); location.reload(); });
 
@@ -380,9 +439,14 @@
         if (!r.ok) { var e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
         md = await r.text();
       }
+<<<<<<< HEAD
       var ctx = { page: page, where: "view" };
       box.innerHTML = head + notice + '<div class="page-body">' + render(md, ctx) + "</div>";
       enhance(box.querySelector(".page-body"), ctx);
+=======
+      box.innerHTML = head + notice + "<div>" + render(md) + "</div>";
+      enhance(box);
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     } catch (err) {
       var msg = err.status === 404 && hasRepo()
         ? "このページの本文はまだありません。上の「編集」から書き始められます。"
@@ -391,6 +455,7 @@
     }
   }
 
+<<<<<<< HEAD
   /* ---------- 特別ページ(プラグインの views) ---------- */
   async function viewSpecial(box, name) {
     var v = views[name];
@@ -409,6 +474,8 @@
     }
   }
 
+=======
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
   /* ---------- 編集 / 新規作成 ---------- */
   async function viewEdit(box, page) {
     if (!hasRepo()) return noRepo(box);
@@ -429,6 +496,7 @@
     buildEditor(box, { isNew: true, page: null, slug: params.get("slug") || "", text: NEW_TEMPLATE });
   }
 
+<<<<<<< HEAD
   // プラグイン(editor フック)に渡す、ツールバーとテキスト操作の道具
   function makeEditorApi(ta) {
     var bar = $("ed-toolbar");
@@ -461,6 +529,8 @@
     };
   }
 
+=======
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
   function buildEditor(box, o) {
     box.classList.add("wide");
     var isNew = o.isNew, page = o.page;
@@ -478,17 +548,26 @@
     h += '<label>カテゴリ<input id="f-cat" type="text" list="f-cats" value="' + esc(page ? page.category : "") + '"></label>';
     h += '<datalist id="f-cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join("") + "</datalist>";
     h += '<label>一言説明<input id="f-sum" type="text" value="' + esc(page ? page.summary || "" : "") + '"></label>';
+<<<<<<< HEAD
     h += '</div><div id="ed-toolbar" class="ed-toolbar"></div>';
     h += '<div class="ed-grid"><textarea id="ed-text" spellcheck="false"></textarea>';
+=======
+    h += '</div><div class="ed-grid"><textarea id="ed-text" spellcheck="false"></textarea>';
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     h += '<div class="preview"><div class="preview-label">プレビュー</div><div id="ed-preview"></div></div></div>';
     h += '<div class="ed-bar"><input id="ed-msg" type="text" placeholder="変更の要約(省略可)">';
     h += '<button class="btn" id="ed-save" type="button">保存する</button>';
     h += '<a href="' + esc(viewHref) + '">キャンセル</a><span id="ed-status" class="status"></span></div>';
+<<<<<<< HEAD
     h += '<p class="meta">記法のヒント: <code>[[ページ名]]</code> でリンク、<code>||ネタバレ||</code> で伏せ字、<code>```infobox</code> で要約欄(それぞれ対応するプラグインが有効なとき)。保存するとGitHubにコミットされ、1〜2分後に公開サイトへ反映されます。</p></div>';
+=======
+    h += '<p class="meta">記法のヒント: <code>[[ページ名]]</code> でリンク、<code>||ネタバレ||</code> で伏せ字、<code>```infobox</code> で要約欄。保存するとGitHubにコミットされ、1〜2分後に公開サイトへ反映されます。</p></div>';
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     box.innerHTML = h;
 
     var ta = $("ed-text"), pv = $("ed-preview"), status = $("ed-status"), saveBtn = $("ed-save");
     ta.value = o.text;
+<<<<<<< HEAD
     var pctx = { page: page, where: "preview" };
     var timer = null;
     function refresh() { pv.innerHTML = render(ta.value, pctx); enhance(pv, pctx); }
@@ -498,6 +577,13 @@
     var ed = makeEditorApi(ta);
     runHook("editor", function (hk) { hk(ed, { page: page, isNew: isNew }); });
 
+=======
+    var timer = null;
+    function refresh() { pv.innerHTML = render(ta.value); enhance(pv); }
+    ta.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(refresh, 150); });
+    refresh();
+
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     function setStatus(msg, isErr) {
       status.textContent = msg;
       status.className = "status" + (isErr ? " err" : "");
@@ -558,7 +644,10 @@
       if (cfg.title) document.title = cfg.title;
       return;
     }
+<<<<<<< HEAD
     if (params.get("view")) return viewSpecial(box, params.get("view"));
+=======
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     if (params.get("new")) return viewNew(box);
     var page = bySlug(current) || findPage(current);
     if (!page) {
@@ -586,12 +675,19 @@
     cfg.repo = cfg.repo || "";
     cfg.branch = cfg.branch || "main";
     pages = cfg.pages || [];
+<<<<<<< HEAD
     await loadPlugins(cfg.plugins);
+=======
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     applyFreshMeta();
     buildSidebar();
     buildCards();
     route();
   }
 
+<<<<<<< HEAD
+=======
+  window.__wiki = { preprocess: preprocess };
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
   init();
 })();

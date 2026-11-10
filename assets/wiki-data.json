@@ -1,5 +1,6 @@
 {
   "title": "LOLBeans Wiki(非公式)",
+<<<<<<< HEAD
   "repo": "tanabesan/wiki",
   "branch": "main",
   "plugins": [
@@ -10,12 +11,17 @@
     "recent-changes",
     "editor-toolbar"
   ],
+=======
+  "repo": "tanabesan/lolwiki",
+  "branch": "main",
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
   "pages": [
     {
       "slug": "game-overview",
       "title": "ゲーム概要",
       "category": "基本",
       "summary": "LOLBeansとはどんなゲームか、基本ルールと遊び方。",
+<<<<<<< HEAD
       "keywords": [
         "概要",
         "ルール",
@@ -23,12 +29,16 @@
         "初心者"
       ],
       "updated": "2026-11-10"
+=======
+      "keywords": ["概要", "ルール", "遊び方", "初心者"]
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     },
     {
       "slug": "stages",
       "title": "ステージ一覧",
       "category": "ステージ・モード",
       "summary": "ステージごとのギミックと攻略ポイントの一覧。",
+<<<<<<< HEAD
       "keywords": [
         "マップ",
         "コース",
@@ -36,24 +46,32 @@
         "ギミック"
       ],
       "updated": "2026-11-10"
+=======
+      "keywords": ["マップ", "コース", "レベル", "ギミック"]
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     },
     {
       "slug": "modes",
       "title": "ゲームモード",
       "category": "ステージ・モード",
       "summary": "モードごとのルールと勝利条件。",
+<<<<<<< HEAD
       "keywords": [
         "モード",
         "バトルロイヤル",
         "ルール"
       ],
       "updated": "2026-11-10"
+=======
+      "keywords": ["モード", "バトルロイヤル", "ルール"]
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     },
     {
       "slug": "skins",
       "title": "スキン・コスメ",
       "category": "コレクション",
       "summary": "ビーンの見た目(スキンなど)の一覧と入手方法。",
+<<<<<<< HEAD
       "keywords": [
         "スキン",
         "見た目",
@@ -61,12 +79,16 @@
         "入手"
       ],
       "updated": "2026-11-10"
+=======
+      "keywords": ["スキン", "見た目", "アイテム", "入手"]
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     },
     {
       "slug": "tips",
       "title": "攻略Tips",
       "category": "攻略",
       "summary": "上達のためのコツや小技をまとめるページ。",
+<<<<<<< HEAD
       "keywords": [
         "コツ",
         "小技",
@@ -74,18 +96,25 @@
         "上達"
       ],
       "updated": "2026-11-10"
+=======
+      "keywords": ["コツ", "小技", "攻略", "上達"]
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     },
     {
       "slug": "glossary",
       "title": "用語集",
       "category": "基本",
       "summary": "ゲーム内外で使われる用語の一覧。",
+<<<<<<< HEAD
       "keywords": [
         "単語",
         "用語",
         "辞書"
       ],
       "updated": "2026-11-10"
+=======
+      "keywords": ["単語", "用語", "辞書"]
+>>>>>>> 8bfc07c3295bdce6dfb9dbd4acb85ab247a6ea39
     }
   ]
 }
