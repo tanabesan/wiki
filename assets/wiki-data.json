@@ -3,12 +3,10 @@
   "repo": "tanabesan/wiki",
   "branch": "main",
   "plugins": [
-    "infobox",
-    "wikilinks",
-    "spoiler",
-    "toc",
-    "recent-changes",
-    "editor-toolbar"
+   "infobox", "wikilinks", "spoiler", "callout",
+   "toc", "backlinks", "table-sort", "image-zoom", "external-links",
+   "fulltext-search", "recent-changes", "random-page", "dark-mode",
+    "editor-toolbar", "draft-autosave"
   ],
   "pages": [
     {

@@ -14,13 +14,16 @@
  *   markdown(md, ctx)   Markdown本文を受け取り、変換した文字列を返す
  *   html(el, ctx)       描画後のHTML(DOM)を加工する
  *   sidebar(el)         サイドバーの el にリンクなどを足す
+ *   search(q)           検索結果を足す。[{ title, href, note }] を返す(Promiseも可)
  *   editor(ed, ctx)     編集画面のツールバーにボタンを足す(ed.addButton / ed.insert / ed.wrap)
+ *                       ed.onSaved(fn) で、保存に成功した後に呼ぶ関数も登録できる
  *   views               特別ページ page.html?view=名前 を追加する
  *
  * api の中身:
  *   api.options          wiki-data.json で渡した設定  例: { "name": "my-plugin", "options": { "x": 1 } }
  *   api.pages()          ページ一覧(wiki-data.json の pages)
  *   api.findPage(名前)   slug かページ名でページを探す
+ *   api.getText(slug)    ページ本文(Markdown)を取得する。Promise。取れなければ空文字
  *   api.href(page)       ページのURL
  *   api.viewHref(名前)   特別ページのURL
  *   api.esc(文字列)      HTML用のエスケープ(外から来た文字をHTMLに入れるときは必ず通す)

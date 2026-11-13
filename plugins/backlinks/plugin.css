@@ -1,0 +1,6 @@
+.backlinks {
+  clear: both; margin-top: 3em; padding: 10px 18px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 0.9rem;
+}
+.backlinks-title { font-weight: 700; margin-bottom: 4px; }
+.backlinks ul { margin: 0; padding-left: 1.2em; }

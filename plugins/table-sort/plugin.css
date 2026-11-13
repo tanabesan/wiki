@@ -1,0 +1,4 @@
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable::after { content: " ↕"; color: var(--muted); font-size: 0.8em; }
+th.sortable[data-sort="asc"]::after { content: " ▲"; color: var(--accent); }
+th.sortable[data-sort="desc"]::after { content: " ▼"; color: var(--accent); }

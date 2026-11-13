@@ -59,7 +59,8 @@
    *       markdown: function (md, ctx) { return md; },      // Markdown本文を変換する
    *       html:     function (el, ctx) {},                  // 描画後のHTML(DOM)を加工する
    *       sidebar:  function (el) {},                       // サイドバーにリンクなどを足す
-   *       editor:   function (ed, ctx) {},                  // 編集画面のツールバーにボタンを足す
+   *       search:   function (q) { return [{ title, href, note }]; },   // 検索結果を足す(Promiseも可)
+   *       editor:   function (ed, ctx) {},                  // 編集画面のツールバーにボタンを足す(ed.onSaved(fn) で保存後の処理も可)
    *       views:    { 名前: { title: "..", render: function (body, ctx) {} } }   // 特別ページ page.html?view=名前
    *     };
    *   });
@@ -116,6 +117,7 @@
       href: href,
       viewHref: function (v) { return "page.html?view=" + encodeURIComponent(v); },
       esc: esc,
+      getText: getText,
       loadCss: function (file) {
         if (!/^[A-Za-z0-9._-]+$/.test(file)) return;
         var key = name + "/" + file;
@@ -246,6 +248,18 @@
     } catch (e) {}
     return null;
   }
+  // ページ本文(Markdown)を取得する。同じページは1回だけ取得して使い回す。取得できなければ空文字。
+  var textCache = {};
+  function getText(slug) {
+    var fresh = freshText(slug);
+    if (fresh !== null) return Promise.resolve(fresh);
+    if (!textCache[slug]) {
+      textCache[slug] = fetch("content/" + encodeURIComponent(slug) + ".md", { cache: "no-cache" })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+        .catch(function () { delete textCache[slug]; return ""; });
+    }
+    return textCache[slug];
+  }
   function applyFreshMeta() {
     try {
       for (var i = 0; i < sessionStorage.length; i++) {
@@ -292,22 +306,43 @@
     if (lo) lo.addEventListener("click", function (ev) { ev.preventDefault(); setToken(""); location.reload(); });
 
     var input = $("q"), results = $("results");
+    var seq = 0;
+    function addResult(title, url, note) {
+      var li = document.createElement("li");
+      li.innerHTML = '<a href="' + esc(url) + '">' + esc(title) + '<span class="cat">' + esc(note || "") + "</span></a>";
+      results.appendChild(li);
+    }
+    function showNone() {
+      results.innerHTML = '<li style="color:var(--muted);font-size:.85rem;padding:6px 8px">見つかりません</li>';
+    }
     input.addEventListener("input", function () {
-      var q = input.value.trim().toLowerCase();
+      var raw = input.value.trim(), q = raw.toLowerCase(), my = ++seq;
       results.innerHTML = "";
       if (!q) return;
       var hits = pages.filter(function (p) {
         var hay = (p.title + " " + (p.summary || "") + " " + p.category + " " + (p.keywords || []).join(" ")).toLowerCase();
         return hay.indexOf(q) >= 0;
       });
-      if (!hits.length) {
-        results.innerHTML = '<li style="color:var(--muted);font-size:.85rem;padding:6px 8px">見つかりません</li>';
-        return;
-      }
-      hits.forEach(function (p) {
-        var li = document.createElement("li");
-        li.innerHTML = '<a href="' + href(p) + '">' + esc(p.title) + '<span class="cat">' + esc(p.category) + "</span></a>";
-        results.appendChild(li);
+      hits.forEach(function (p) { addResult(p.title, href(p), p.category); });
+      // プラグインの search フック(本文検索など)。タイトルの検索結果の下に足す
+      var extras = [];
+      runHook("search", function (h) {
+        extras.push(Promise.resolve(h(raw)).then(function (r) { return Array.isArray(r) ? r : []; }, function () { return []; }));
+      });
+      if (!extras.length) { if (!hits.length) showNone(); return; }
+      Promise.all(extras).then(function (lists) {
+        if (my !== seq) return; // 入力が進んだ後の古い結果は捨てる
+        var seen = {}, added = 0;
+        hits.forEach(function (p) { seen[href(p)] = true; });
+        lists.forEach(function (l) {
+          l.forEach(function (it) {
+            if (!it || !it.href || seen[it.href]) return;
+            seen[it.href] = true;
+            addResult(it.title || it.href, it.href, it.note);
+            added++;
+          });
+        });
+        if (!hits.length && !added) showNone();
       });
     });
   }
@@ -402,7 +437,9 @@
     document.title = title + " - " + (cfg.title || "Wiki");
     box.innerHTML = "<h1>" + esc(title) + '</h1><div class="view-body"></div>';
     try {
-      await v.render(box.querySelector(".view-body"), { page: null, where: "view" });
+      var vb = box.querySelector(".view-body"), vctx = { page: null, where: "view" };
+      await v.render(vb, vctx);
+      enhance(vb, vctx);
     } catch (err) {
       warn("特別ページ " + name + " の表示でエラー:", err);
       box.querySelector(".view-body").innerHTML = '<div class="notice">このページを表示できませんでした。</div>';
@@ -430,11 +467,13 @@
   }
 
   // プラグイン(editor フック)に渡す、ツールバーとテキスト操作の道具
-  function makeEditorApi(ta) {
+  function makeEditorApi(ta, savedCbs) {
     var bar = $("ed-toolbar");
     function fire() { ta.dispatchEvent(new Event("input")); }
     return {
       textarea: ta,
+      // 保存に成功したあとに呼ぶ関数を登録する(下書きの削除など)
+      onSaved: function (fn) { savedCbs.push(fn); },
       addButton: function (label, title, onclick) {
         var b = document.createElement("button");
         b.type = "button";
@@ -495,7 +534,8 @@
     ta.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(refresh, 150); });
     refresh();
 
-    var ed = makeEditorApi(ta);
+    var savedCbs = [];
+    var ed = makeEditorApi(ta, savedCbs);
     runHook("editor", function (hk) { hk(ed, { page: page, isNew: isNew }); });
 
     function setStatus(msg, isErr) {
@@ -538,6 +578,7 @@
             });
           }, message);
         }
+        savedCbs.forEach(function (fn) { try { fn(slug); } catch (err) { warn("保存後の処理でエラー:", err); } });
         freshSet(slug, text, meta);
         location.href = "page.html?p=" + encodeURIComponent(slug) + "&saved=1";
       } catch (e) {

@@ -1,0 +1,11 @@
+.callout {
+  margin: 1.2em 0; padding: 4px 16px 6px;
+  background: var(--panel); border: 1px solid var(--line); border-left: 5px solid #3b82a0; border-radius: 6px;
+}
+.callout-title { font-weight: 700; margin-top: 6px; }
+.callout > p:last-child { margin-bottom: 6px; }
+.callout-note   { border-left-color: #6b7280; }
+.callout-info   { border-left-color: #3b82a0; }
+.callout-tip    { border-left-color: #3f9d6b; }
+.callout-warn   { border-left-color: #d49a1c; }
+.callout-danger { border-left-color: #c0392b; }
