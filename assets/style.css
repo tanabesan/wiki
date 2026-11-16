@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
   padding: 56px 16px 20px;
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
-.layout.side-closed { grid-template-columns: 0 1fr; }
+.layout.side-closed { grid-template-columns: 1fr; }
 .layout.side-closed .sidebar { display: none; }
 .layout.side-closed main { padding-left: 72px; }
 .side-toggle {
