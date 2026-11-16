@@ -52,7 +52,7 @@
   /* =====================================================================
    * プラグイン機構
    *
-   * プラグインは plugins/<名前>/plugin.js に置き、次の形で登録します。
+   * プラグインは plugins/bundle.js(まとめ版)か plugins/<名前>/plugin.js に置き、次の形で登録します。
    *
    *   Wiki.register("名前", function (api) {
    *     return {
@@ -73,9 +73,11 @@
   var views = {};
   var cssLoaded = {};
   var cssPromises = [];
+  var loadingBundle = false;
+  var bundledOrder = [];
 
   window.Wiki = {
-    register: function (name, factory) { factories[name] = factory; }
+    register: function (name, factory) { factories[name] = factory; if (loadingBundle) bundledOrder.push(name); }
   };
 
   function warn(msg, err) {
@@ -108,6 +110,18 @@
     });
   }
 
+  // plugins/bundle.js(全プラグインを1ファイルにまとめたもの)があれば先に読み込む。無くてもエラーにしない
+  var bundled = {};
+  function loadBundle() {
+    return new Promise(function (resolve) {
+      var s = document.createElement("script");
+      s.src = "plugins/bundle.js";
+      s.onload = function () { resolve(true); };
+      s.onerror = function () { resolve(false); };
+      document.head.appendChild(s);
+    });
+  }
+
   function makeApi(name, options) {
     return {
       name: name,
@@ -118,8 +132,23 @@
       viewHref: function (v) { return "page.html?view=" + encodeURIComponent(v); },
       esc: esc,
       getText: getText,
+      // GitHubへの書き込み(編集者のトークンを使う)。画像の追加などに使う
+      github: {
+        ready: function () { return hasRepo() && !!getToken(); },
+        exists: function (path) {
+          if (!/^[A-Za-z0-9._\/-]+$/.test(path) || path.indexOf("..") >= 0) return Promise.reject(new Error("無効なパスです"));
+          return gh("GET", "/contents/" + path + "?ref=" + encodeURIComponent(cfg.branch)).then(
+            function () { return true; },
+            function (e) { if (e.status === 404) return false; throw e; });
+        },
+        putBase64: function (path, b64, message) {
+          if (!/^[A-Za-z0-9._\/-]+$/.test(path) || path.indexOf("..") >= 0) return Promise.reject(new Error("無効なパスです"));
+          return gh("PUT", "/contents/" + path, { message: message, content: b64, branch: cfg.branch });
+        },
+        explain: apiErrorMessage
+      },
       loadCss: function (file) {
-        if (!/^[A-Za-z0-9._-]+$/.test(file)) return;
+        if (!/^[A-Za-z0-9._-]+$/.test(file) || bundled[name]) return; // まとめ版の CSS は bundle.css で読み込み済み
         var key = name + "/" + file;
         if (cssLoaded[key]) return;
         cssLoaded[key] = true;
@@ -134,9 +163,33 @@
     };
   }
 
-  async function loadPlugins(list) {
-    var entries = normalizePlugins(list);
-    var ok = await Promise.all(entries.map(function (e) { return loadScript(e.name); }));
+  async function loadPlugins(list, disabled) {
+    loadingBundle = true;
+    var hasBundle = await loadBundle();
+    loadingBundle = false;
+    var entries;
+    if (Array.isArray(list) && list.length === 0) {
+      entries = []; // "plugins": [] と書いたときは、プラグインを全部止める
+    } else if (hasBundle && bundledOrder.length) {
+      bundledOrder.forEach(function (n) { bundled[n] = true; });
+      var l = Array.isArray(list) ? list.slice() : bundledOrder.slice();
+      // まとめ版に入っているプラグインは、wiki-data.json に書いていなくても有効にする(止めるときは "disabled")
+      var named = {};
+      l.forEach(function (e) { named[typeof e === "string" ? e : e && e.name] = true; });
+      bundledOrder.forEach(function (n) { if (!named[n] && n !== "_template") l.push(n); });
+      var off = {};
+      (Array.isArray(disabled) ? disabled : []).forEach(function (n) { off[n] = true; });
+      entries = normalizePlugins(l).filter(function (e) { return !off[e.name]; });
+      var link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "plugins/bundle.css";
+      cssPromises.push(new Promise(function (resolve) { link.onload = link.onerror = function () { resolve(); }; }));
+      document.head.appendChild(link);
+    } else {
+      entries = normalizePlugins(list);
+    }
+    // まとめ版に無いプラグインだけ、plugins/<名前>/plugin.js を読み込む
+    var ok = await Promise.all(entries.map(function (e) { return factories[e.name] ? true : loadScript(e.name); }));
     // 登録は wiki-data.json の並び順で行う(Markdown変換の順番が決まるため)
     entries.forEach(function (e, i) {
       if (!ok[i]) return;
@@ -474,6 +527,11 @@
       textarea: ta,
       // 保存に成功したあとに呼ぶ関数を登録する(下書きの削除など)
       onSaved: function (fn) { savedCbs.push(fn); },
+      // 編集画面の下に出るメッセージ欄に、メッセージを出す(isErr が true なら赤字)
+      status: function (msg, isErr) {
+        var st = $("ed-status");
+        if (st) { st.textContent = msg; st.className = "status" + (isErr ? " err" : ""); }
+      },
       addButton: function (label, title, onclick) {
         var b = document.createElement("button");
         b.type = "button";
@@ -627,7 +685,7 @@
     cfg.repo = cfg.repo || "";
     cfg.branch = cfg.branch || "main";
     pages = cfg.pages || [];
-    await loadPlugins(cfg.plugins);
+    await loadPlugins(cfg.plugins, cfg.disabled);
     applyFreshMeta();
     buildSidebar();
     buildCards();

@@ -1,0 +1,92 @@
+/* ===== infobox ===== */
+.infobox {
+  float: right; width: 280px; margin: 0 0 16px 24px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  overflow: hidden; font-size: 0.9rem;
+}
+.infobox .ib-title { background: var(--accent); color: #fff; padding: 8px 12px; font-weight: 700; text-align: center; }
+.infobox .ib-img { background: var(--accent-soft); color: var(--muted); text-align: center; padding: 40px 0; font-size: 0.8rem; }
+.infobox img { display: block; width: 100%; }
+.infobox table { width: 100%; border-collapse: collapse; }
+.infobox th, .infobox td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.infobox th { width: 38%; color: var(--muted); font-weight: 500; }
+@media (max-width: 800px) {
+  .infobox { float: none; width: 100%; margin: 0 0 20px; }
+}
+
+/* ===== wikilinks ===== */
+.missing { color: var(--muted); border-bottom: 1px dotted var(--muted); cursor: help; }
+
+/* ===== spoiler ===== */
+.spoiler { background: var(--text); color: var(--text); border-radius: 3px; padding: 0 4px; cursor: pointer; }
+.spoiler.open { background: transparent; }
+
+/* ===== callout ===== */
+.callout {
+  margin: 1.2em 0; padding: 4px 16px 6px;
+  background: var(--panel); border: 1px solid var(--line); border-left: 5px solid #3b82a0; border-radius: 6px;
+}
+.callout-title { font-weight: 700; margin-top: 6px; }
+.callout > p:last-child { margin-bottom: 6px; }
+.callout-note   { border-left-color: #6b7280; }
+.callout-info   { border-left-color: #3b82a0; }
+.callout-tip    { border-left-color: #3f9d6b; }
+.callout-warn   { border-left-color: #d49a1c; }
+.callout-danger { border-left-color: #c0392b; }
+
+/* ===== toc ===== */
+.toc {
+  display: inline-block; min-width: 220px; max-width: 100%;
+  margin: 1em 0; padding: 10px 18px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  font-size: 0.9rem;
+}
+.toc-title { font-weight: 700; text-align: center; margin-bottom: 4px; }
+.toc ol { list-style: none; margin: 0; padding: 0; line-height: 1.9; }
+.toc .l3 { padding-left: 1.4em; font-size: 0.95em; }
+.toc a { color: var(--accent); }
+
+/* ===== backlinks ===== */
+.backlinks {
+  clear: both; margin-top: 3em; padding: 10px 18px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 0.9rem;
+}
+.backlinks-title { font-weight: 700; margin-bottom: 4px; }
+.backlinks ul { margin: 0; padding-left: 1.2em; }
+
+/* ===== table-sort ===== */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable::after { content: " ↕"; color: var(--muted); font-size: 0.8em; }
+th.sortable[data-sort="asc"]::after { content: " ▲"; color: var(--accent); }
+th.sortable[data-sort="desc"]::after { content: " ▼"; color: var(--accent); }
+
+/* ===== image-zoom ===== */
+img.zoomable { cursor: zoom-in; }
+.zoom-overlay {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.82); cursor: zoom-out;
+}
+.zoom-overlay img { max-width: 94vw; max-height: 94vh; object-fit: contain; }
+
+/* ===== external-links ===== */
+a.external::after { content: "↗"; font-size: 0.75em; margin-left: 2px; }
+
+/* ===== dark-mode ===== */
+:root[data-theme="light"] {
+  --bg: #fafaf8;
+  --panel: #ffffff;
+  --text: #222;
+  --muted: #666;
+  --line: #e2e0da;
+  --accent: #7a2e3a;
+  --accent-soft: #f3e6e8;
+}
+:root[data-theme="dark"] {
+  --bg: #16161a;
+  --panel: #1f1f25;
+  --text: #e8e6e1;
+  --muted: #9a9aa3;
+  --line: #33333c;
+  --accent: #d98b97;
+  --accent-soft: #2c2023;
+}

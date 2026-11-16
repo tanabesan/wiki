@@ -23,12 +23,12 @@ wiki/
 │   ├── *.md              各ページの本文
 │   └── _template.md      新規ページのひな形
 └── plugins/
-    ├── infobox/          ```infobox で右側の要約欄
-    ├── wikilinks/        [[ページ名]] でリンク
-    ├── spoiler/          ||ネタバレ|| の伏せ字
-    ├── toc/              目次を自動で入れる
-    ├── recent-changes/   「最近の更新」ページ
-    ├── editor-toolbar/   編集画面のボタン(見出し・太字・表など)
+    ├── infobox/ wikilinks/ spoiler/ callout/             書き方を増やすもの
+    ├── toc/ backlinks/ table-sort/ image-zoom/ external-links/   ページの見た目・動き
+    ├── fulltext-search/ recent-changes/ random-page/     探す・見つける
+    ├── dark-mode/                                        テーマ切り替え
+    ├── editor-toolbar/ image-upload/ draft-autosave/     編集を助けるもの
+    ├── bundle.js / bundle.css   全プラグインをまとめたもの(自動生成)
     └── _template/        自作プラグインのひな形
 ```
 
@@ -42,7 +42,17 @@ wiki/
 
 ## プラグインの使い方
 
-### 有効・無効にする
+### まとめ版(bundle.js)— 基本はこれだけ
+
+同梱のプラグインは `plugins/bundle.js`(と `plugins/bundle.css`)の2ファイルに全部まとめてあります。**この2ファイルを置き換えるだけで、プラグインの追加・更新ができます。** `wiki-data.json` に名前を書かなくても、まとめ版に入っているプラグインは自動で有効になります。
+
+- 止めたいもの: `wiki-data.json` に `"disabled": ["toc", "backlinks"]` のように書く
+- 設定(options)を付けたいもの: `"plugins"` に `{ "name": "image-upload", "options": { ... } }` と書く(書いたものは、書いた順で先に読み込まれます)
+- 全部止める: `"plugins": []`
+- 自作プラグインを `plugins/名前/` に置いたときだけ、`python tools/build-bundle.py` を実行すると、まとめ版に取り込まれます(実行しない場合は、従来どおり `"plugins"` に名前を書けば、フォルダから読み込まれます)
+- `plugins/bundle.js` が無いときは、従来どおり `"plugins"` に書いた名前だけをフォルダから読み込みます
+
+### 有効・無効にする(フォルダ方式)
 
 `assets/wiki-data.json` の `"plugins"` に、使うプラグインの名前を並べます。消せば無効になります。
 
@@ -51,9 +61,19 @@ wiki/
   "infobox",
   "wikilinks",
   "spoiler",
+  "callout",
   { "name": "toc", "options": { "minHeadings": 3 } },
+  "backlinks",
+  "table-sort",
+  "image-zoom",
+  "external-links",
+  { "name": "fulltext-search", "options": { "limit": 20, "minLength": 2 } },
   { "name": "recent-changes", "options": { "limit": 30 } },
-  "editor-toolbar"
+  "random-page",
+  "dark-mode",
+  "editor-toolbar",
+  { "name": "image-upload", "options": { "dir": "images", "maxMB": 5, "maxWidth": 1600 } },
+  "draft-autosave"
 ]
 ```
 
@@ -68,9 +88,19 @@ wiki/
 | `infobox` | ` ```infobox ` ブロックを右側の要約欄にする | なし |
 | `wikilinks` | `[[ページ名]]` / `[[slug\|表示名]]` をリンクにする(無いページは点線表示) | なし |
 | `spoiler` | `\|\|ネタバレ\|\|` をクリックで表示される伏せ字にする | なし |
+| `callout` | `:::warn 見出し` 〜 `:::` で、色付きの囲み(注意書きなど)を書ける。種類は note / info / tip / warn / danger(入れ子は不可) | なし |
 | `toc` | 見出し(`##`・`###`)が一定数以上のページに目次を入れる | `minHeadings`(既定 3) |
+| `backlinks` | ページの末尾に「このページへのリンク元」を出す | なし |
+| `table-sort` | 表の見出しをクリックして、その列で並べ替える(数字は大小、文字は五十音順) | なし |
+| `image-zoom` | 画像をクリックして拡大表示する(閉じるのは、クリックか Esc) | なし |
+| `external-links` | 外部サイトへのリンクを新しいタブで開き、`↗` を付ける | なし |
+| `fulltext-search` | サイドバーの検索で、ページの本文の中も探す | `limit`(既定 20)、`minLength`(既定 2) |
 | `recent-changes` | 「最近の更新」ページを追加し、サイドバーにリンクを出す(更新日順) | `limit`(既定 30) |
+| `random-page` | サイドバーに「おまかせ表示」を出し、ランダムなページを開く | なし |
+| `dark-mode` | サイドバーのボタンで、テーマを「自動 → ライト → ダーク」と切り替える(ブラウザに保存) | なし |
 | `editor-toolbar` | 編集画面に、見出し・太字・リンク・表・ネタバレ・要約欄のボタンを出す | なし |
+| `image-upload` | 編集画面から画像をGitHubに追加して、本文に挿入する(ボタン・貼り付け・ドラッグ&ドロップ)。幅が大きい画像は自動で縮小する | `dir`(保存先。既定 `images`)、`maxMB`(1枚の上限。既定 5)、`maxWidth`(縮小する幅。既定 1600) |
+| `draft-autosave` | 編集中の内容をブラウザに自動で下書き保存し、「下書きを復元」で戻せる(保存に成功すると消える) | なし |
 
 ### 追加する(他の人が作ったものや自作)
 
@@ -101,12 +131,13 @@ Wiki.register("hello", function (api) {
 | `markdown(md, ctx)` | Markdownを変換する前に呼ばれる。変換後の文字列を返す |
 | `html(el, ctx)` | 描画後のHTMLを加工する(目次の挿入、クリック動作の付与など) |
 | `sidebar(el)` | サイドバーの `el` にリンクなどを足す |
-| `editor(ed, ctx)` | 編集画面のツールバーにボタンを足す(`ed.addButton`・`ed.insert`・`ed.wrap`) |
-| `views` | `page.html?view=名前` という特別ページを追加する(`{ 名前: { title, render(body) } }`) |
+| `search(q)` | 検索結果を足す。`[{ title, href, note }]` を返す(Promiseも可)。ページ名などの結果の下に出る |
+| `editor(ed, ctx)` | 編集画面のツールバーにボタンを足す(`ed.addButton`・`ed.insert`・`ed.wrap`)。`ed.onSaved(fn)` で保存後の処理を、`ed.status(メッセージ, 赤字か)` で編集画面の下にメッセージを出せる |
+| `views` | `page.html?view=名前` という特別ページを追加する(`{ 名前: { title, render(body) } }`)。この中にも `html` フックが適用される |
 
 `ctx` は `{ page, where }` です。`where` は `"view"`(閲覧)か `"preview"`(編集中のプレビュー)で、`page` は新規作成中なら `null` です。
 
-`api` で使えるもの: `api.options`(wiki-data.json で渡した設定)、`api.pages()`、`api.findPage(名前)`、`api.href(page)`、`api.viewHref(名前)`、`api.esc(文字列)`(HTMLエスケープ)、`api.loadCss("plugin.css")`。
+`api` で使えるもの: `api.options`(wiki-data.json で渡した設定)、`api.pages()`、`api.findPage(名前)`、`api.getText(slug)`(ページ本文のMarkdownを取得。Promise。同じページは使い回し、取れなければ空文字)、`api.github`(`ready()`・`exists(path)`・`putBase64(path, base64, message)`・`explain(err)`。編集者のトークンでGitHubに書き込む。画像の追加などに使う)、`api.href(page)`、`api.viewHref(名前)`、`api.esc(文字列)`(HTMLエスケープ)、`api.loadCss("plugin.css")`。
 
 **安全のために**
 - プラグインはサイトの中で自由にJavaScriptを実行でき、編集者がブラウザに保存したトークンにも触れます。**中身を確認したものだけを入れてください。** リポジトリに書き込める人は誰でもプラグインを足せる点も覚えておいてください。
@@ -136,6 +167,7 @@ Wiki.register("hello", function (api) {
 
 - **編集**: ページ上部の「編集」タブ → 本文を書き換え(右にプレビュー)→「保存する」
 - **新規ページ**: サイドバーの「＋ 新しいページを作る」→ ファイル名(半角小文字英数字とハイフン)・ページ名・カテゴリを入れて保存
+- **画像の追加**: 編集画面で、ツールバーの「画像を追加」を押して選ぶか、画像を本文の欄に貼り付け(Ctrl+V)・ドラッグ&ドロップします(`image-upload` が有効なとき)。PNG・JPEG・GIF・WebPに対応し、`images/` フォルダに保存されて、本文に `![名前](images/名前.png)` が入ります。ファイル名は半角英数字に整えられ(日本語の名前は日時の名前になります)、同じ名前があれば `-2` などが付きます。SVGは安全のため追加できません。保存後、公開サイトに表示されるまでは1〜2分かかります(その間も、追加した本人のブラウザでは表示されます)
 - **履歴**: 各ページの「履歴」タブ(GitHubのコミット履歴が開きます)。戻したいときはGitHub上で以前の版に戻せます
 - **ページの削除・名前変更**: GitHub上で `content/xxx.md` を削除し、`assets/wiki-data.json` から該当の項目を消してください
 
@@ -151,10 +183,11 @@ Wiki.register("hello", function (api) {
 | `[[slug\|表示名]]` | 表示名を変えたリンク | `wikilinks` |
 | `\|\|ネタバレ\|\|` | クリックで表示される伏せ字 | `spoiler` |
 | ` ```infobox ` ブロック | 右側の要約欄(書式は `_template.md` 参照) | `infobox` |
+| `:::warn 見出し` 〜 `:::` | 色付きの囲み(note / info / tip / warn / danger) | `callout` |
 
 ## 以前のバージョンから更新する場合
 
-すでにGitHubに置いて運用している場合は、`content/` と `assets/wiki-data.json` **以外**を新しいファイルで置き換えてください。この2つはサイト上の編集で書き換わっているため、上書きすると編集内容が消えます。そのうえで、`assets/wiki-data.json` に `"plugins"` を手で追加してください(上の例のとおり。追加しなくても、`infobox`・`wikilinks`・`spoiler` の3つは動きます)。
+すでにGitHubに置いて運用している場合は、`content/` と `assets/wiki-data.json` **以外**を新しいファイルで置き換えてください。この2つはサイト上の編集で書き換わっているため、上書きすると編集内容が消えます。`plugins/bundle.js` と `plugins/bundle.css` も置けば、`wiki-data.json` を触らなくても、まとめ版のプラグインが自動で有効になります(止めたいものだけ `"disabled"` に書く)。まとめ版が無い場合に `"plugins"` の項目自体が無いときは、`infobox`・`wikilinks`・`spoiler` の3つだけが動きます。
 
 ## 注意点
 
