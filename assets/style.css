@@ -36,9 +36,20 @@ a:hover { text-decoration: underline; }
 .sidebar {
   background: var(--panel);
   border-right: 1px solid var(--line);
-  padding: 20px 16px;
+  padding: 56px 16px 20px;
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
+.layout.side-closed { grid-template-columns: 0 1fr; }
+.layout.side-closed .sidebar { display: none; }
+.layout.side-closed main { padding-left: 72px; }
+.side-toggle {
+  position: fixed; top: 10px; left: 10px; z-index: 50;
+  width: 38px; height: 38px; padding: 0; font-size: 1.2rem; line-height: 1;
+  border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  background: var(--panel); color: var(--text);
+}
+.side-toggle:hover { background: var(--accent-soft); }
+.side-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .site-title { font-size: 1.15rem; font-weight: 700; margin: 0 0 14px; }
 .site-title a { color: var(--text); }
 .search input {
@@ -137,4 +148,6 @@ main.wide { max-width: 1240px; }
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   main { padding: 24px 18px 60px; }
+  .layout.side-closed { grid-template-columns: 1fr; }
+  .layout.side-closed main { padding: 60px 18px 60px; }
 }

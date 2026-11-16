@@ -327,6 +327,37 @@
     } catch (e) {}
   }
 
+  /* ---------- 左メニューの開閉(☰ ボタン。開閉の状態はこのブラウザに覚える) ---------- */
+  function buildSideToggle() {
+    var layout = document.querySelector(".layout"), side = $("sidebar");
+    if (!layout || !side || $("side-toggle")) return;
+    var KEY = "wikiSideClosed";
+    var closed;
+    try {
+      var saved = localStorage.getItem(KEY);
+      closed = saved === null ? window.matchMedia("(max-width: 800px)").matches : saved === "1";
+    } catch (e) { closed = false; }
+    var btn = document.createElement("button");
+    btn.id = "side-toggle";
+    btn.type = "button";
+    btn.className = "side-toggle";
+    btn.textContent = "☰";
+    btn.setAttribute("aria-controls", "sidebar");
+    function apply() {
+      layout.classList.toggle("side-closed", closed);
+      btn.setAttribute("aria-expanded", closed ? "false" : "true");
+      btn.setAttribute("aria-label", closed ? "メニューを開く" : "メニューを閉じる");
+      btn.title = closed ? "メニューを開く" : "メニューを閉じる";
+    }
+    btn.addEventListener("click", function () {
+      closed = !closed;
+      apply();
+      try { localStorage.setItem(KEY, closed ? "1" : "0"); } catch (e) {}
+    });
+    document.body.appendChild(btn);
+    apply();
+  }
+
   /* ---------- サイドバー・カード ---------- */
   function buildSidebar() {
     var side = $("sidebar");
@@ -688,6 +719,7 @@
     await loadPlugins(cfg.plugins, cfg.disabled);
     applyFreshMeta();
     buildSidebar();
+    buildSideToggle();
     buildCards();
     route();
   }
