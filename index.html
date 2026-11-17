@@ -3,20 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data:; connect-src 'self'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src * data:; connect-src 'self'; base-uri 'self'; form-action 'self'">
   <title>Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar" id="sidebar"></aside>
   <main>
-    <h1>LOLBeans Wiki(非公式)</h1>
-    <p class="meta">LOLBeansの情報をまとめるファンWikiです。</p>
+    <section class="home-hero">
+      <span class="eyebrow">UNOFFICIAL FAN WIKI</span>
+      <h1>LOLBeans Wiki</h1>
+      <p>LOLBeansの情報をまとめる、非公式のファンWikiです。みんなで書いて、みんなで育てます。</p>
+      <div class="btns">
+        <a class="btn" id="hero-first" href="#pages">はじめに読む <span class="ms" aria-hidden="true">arrow_forward</span></a>
+        <a class="btn ghost" href="#pages">ページ一覧</a>
+      </div>
+    </section>
 
-    <p>左のメニューか検索ボックスから、各ページに移動できます。</p>
-
-    <h2>ページ一覧</h2>
+    <h2 id="pages">ページ一覧</h2>
     <div class="card-grid" id="page-cards"></div>
   </main>
 </div>

@@ -231,3 +231,10 @@ Wiki.register("hello", function (api) {
 - `ボタン` の行き先は、ページ名(slug かタイトル)か `https://` のURLです。何個でも書けます。
 - 背景をサイト全体に付けるときは、`wiki-data.json` の `"plugins"` に `{ "name": "page-background", "options": { "image": "images/bg.png", "opacity": 88 } }` と書きます。ページごとの `background` が優先され、`画像: なし` でそのページだけ消せます。
 - 追加したばかりの画像は、公開サイトに出るまで1〜2分かかります。
+
+## 見た目(デザイン)とアイコン
+
+- 色や形は `assets/style.css` の先頭にある変数(`--accent` など)で変えられます。暗い配色は、ブラウザの設定に合わせて自動で切り替わります。
+- アイコンは、Google の [Material Symbols](https://fonts.google.com/icons) を使っています。インターネットに繋がっていないと、アイコンは出ません(メニューのボタンだけは「☰」で代わりに出ます)。
+- トップページのカードのアイコンは、`wiki-data.json` の各ページに `"icon": "flag"` のように、Material Symbols の名前を書くと変えられます(省略すると `article`)。
+- Google Fonts を読み込むため、`index.html` と `page.html` のセキュリティ設定(CSP)に `fonts.googleapis.com` と `fonts.gstatic.com` を許可してあります。
