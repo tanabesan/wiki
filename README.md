@@ -28,6 +28,7 @@ wiki/
     ├── fulltext-search/ recent-changes/ random-page/     探す・見つける
     ├── dark-mode/                                        テーマ切り替え
     ├── editor-toolbar/ image-upload/ draft-autosave/     編集を助けるもの
+    ├── hero/ page-background/                            バナーと背景画像
     ├── bundle.js / bundle.css   全プラグインをまとめたもの(自動生成)
     └── _template/        自作プラグインのひな形
 ```
@@ -101,6 +102,8 @@ wiki/
 | `editor-toolbar` | 編集画面に、見出し・太字・リンク・表・ネタバレ・要約欄のボタンを出す | なし |
 | `image-upload` | 編集画面から画像をGitHubに追加して、本文に挿入する(ボタン・貼り付け・ドラッグ&ドロップ)。幅が大きい画像は自動で縮小する | `dir`(保存先。既定 `images`)、`maxMB`(1枚の上限。既定 5)、`maxWidth`(縮小する幅。既定 1600) |
 | `draft-autosave` | 編集中の内容をブラウザに自動で下書き保存し、「下書きを復元」で戻せる(保存に成功すると消える) | なし |
+| `hero` | ページの上に、画像・タイトル・ボタンつきの大きなバナーを出す。編集画面の「ヒーロー」ボタンでひな形が入る | なし |
+| `page-background` | サイト全体、またはページごとの背景画像。編集画面の「背景」ボタンでひな形が入る | `image`(全体の背景画像), `opacity`(本文の板の濃さ 40〜100) |
 
 ### 追加する(他の人が作ったものや自作)
 
@@ -202,3 +205,29 @@ Wiki.register("hello", function (api) {
 
 - ターミナルで `python3 -m http.server` を実行して `http://localhost:8000/` を開く
 - VS Code の拡張機能「Live Server」を使う
+
+## バナー(ヒーロー)と背景画像
+
+先に「画像を追加」で画像を入れておき、本文にこう書きます(どの行も省略できます)。
+
+````
+```hero
+画像: images/banner.png
+タイトル: LOLBeansへようこそ
+説明: みんなで作る非公式Wiki
+ボタン: ゲーム概要 | game-overview
+高さ: 280
+暗さ: 40
+```
+````
+
+````
+```background
+画像: images/stage-bg.png
+不透明度: 85
+```
+````
+
+- `ボタン` の行き先は、ページ名(slug かタイトル)か `https://` のURLです。何個でも書けます。
+- 背景をサイト全体に付けるときは、`wiki-data.json` の `"plugins"` に `{ "name": "page-background", "options": { "image": "images/bg.png", "opacity": 88 } }` と書きます。ページごとの `background` が優先され、`画像: なし` でそのページだけ消せます。
+- 追加したばかりの画像は、公開サイトに出るまで1〜2分かかります。

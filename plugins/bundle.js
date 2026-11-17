@@ -696,3 +696,167 @@ Wiki.register("draft-autosave", function (api) {
 });
 
 })();
+/* ===== hero ===== */
+(function () {
+/*
+ * hero: ページの上に、大きな画像つきのバナー(ヒーロー)を出す
+ *
+ * 本文に、こう書きます(行はどれも省略できます):
+ *
+ *   ```hero
+ *   画像: images/banner.png
+ *   タイトル: LOLBeansへようこそ
+ *   説明: みんなで作る非公式Wiki
+ *   ボタン: ゲーム概要 | game-overview
+ *   高さ: 280
+ *   暗さ: 40
+ *   ```
+ *
+ * 画像: images/ の画像か、https:// で始まるURL。無ければ色のグラデーションになります
+ * ボタン: 「文字 | 行き先」。行き先はページ名(slug)かタイトル、または https:// のURL。何個でも書けます
+ * 高さ: 120〜600(px)  /  暗さ: 0〜80(%)。画像の上に重ねる黒の濃さで、文字を読みやすくします
+ * ※ 追加したばかりの画像は、公開サイトに出るまで1〜2分かかります。
+ */
+Wiki.register("hero", function (api) {
+  api.loadCss("plugin.css");
+
+  function safeUrl(v) {
+    v = String(v || "").trim();
+    if (/^https:\/\/[^\s"'()\\<>]+$/.test(v)) return v;
+    if (/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(v) && v.indexOf("..") < 0) return v;
+    return "";
+  }
+  function num(v, min, max, def) {
+    var n = parseInt(v, 10);
+    return isNaN(n) ? def : Math.max(min, Math.min(max, n));
+  }
+
+  return {
+    markdown: function (md) {
+      return md.replace(/```hero[ \t]*\r?\n([\s\S]*?)```/g, function (_, body) {
+        var o = { buttons: [] };
+        body.split(/\r?\n/).forEach(function (l) {
+          var m = l.match(/^\s*([^:：]+)[:：]\s*(.*)$/);
+          if (!m) return;
+          var k = m[1].trim(), v = m[2].trim();
+          if (k === "ボタン") o.buttons.push(v); else o[k] = v;
+        });
+        var h = '<div class="hero" data-img="' + api.esc(safeUrl(o["画像"])) + '" data-h="' + num(o["高さ"], 120, 600, 260) +
+          '" data-dim="' + num(o["暗さ"], 0, 80, 35) + '"><div class="hero-inner">';
+        if (o["タイトル"]) h += '<div class="hero-title">' + api.esc(o["タイトル"]) + "</div>";
+        if (o["説明"]) h += '<div class="hero-sub">' + api.esc(o["説明"]) + "</div>";
+        if (o.buttons.length) {
+          h += '<div class="hero-btns">';
+          o.buttons.forEach(function (b) {
+            var parts = b.split(/[|｜]/), label = parts[0].trim(), to = (parts[1] || "").trim();
+            if (!label) return;
+            var p = api.findPage(to), url = p ? api.href(p) : safeUrl(to);
+            h += url ? '<a class="hero-btn" href="' + api.esc(url) + '">' + api.esc(label) + "</a>" : "";
+          });
+          h += "</div>";
+        }
+        return "\n\n" + h + "</div></div>\n\n";
+      });
+    },
+    html: function (el) {
+      el.querySelectorAll(".hero").forEach(function (d) {
+        var img = d.getAttribute("data-img"), h = num(d.getAttribute("data-h"), 120, 600, 260), dim = num(d.getAttribute("data-dim"), 0, 80, 35);
+        d.style.minHeight = h + "px";
+        var shade = "linear-gradient(rgba(0,0,0," + (dim / 100 * 0.6).toFixed(2) + "),rgba(0,0,0," + (dim / 100).toFixed(2) + "))";
+        if (safeUrl(img)) d.style.backgroundImage = shade + ', url("' + safeUrl(img) + '")';
+        else d.classList.add("hero-plain");
+      });
+    },
+    editor: function (ed) {
+      ed.addButton("ヒーロー", "ページの上に画像つきバナーを入れる", function () {
+        ed.insert("\n```hero\n画像: images/\nタイトル: タイトル\n説明: 一言の説明\nボタン: 文字 | game-overview\n高さ: 260\n暗さ: 35\n```\n");
+      });
+    }
+  };
+});
+
+})();
+/* ===== page-background ===== */
+(function () {
+/*
+ * page-background: サイト全体、またはページごとの背景画像
+ *
+ * ■ サイト全体の背景: assets/wiki-data.json の "plugins" に、設定つきで書く
+ *     { "name": "page-background", "options": { "image": "images/bg.png", "opacity": 88 } }
+ *   (画像を決めないときは、何も表示しません)
+ *
+ * ■ ページごとの背景: 本文のどこかに書く(そのページだけ、サイト全体の設定より優先)
+ *     ```background
+ *     画像: images/stage-bg.png
+ *     不透明度: 85
+ *     ```
+ *   画像: 「なし」と書くと、そのページだけ背景を消します
+ *
+ * 画像: images/ の画像か、https:// で始まるURL
+ * 不透明度: 40〜100(%)。本文の下に敷く板の濃さです。小さいほど背景が透けますが、文字は読みにくくなります
+ * ※ 追加したばかりの画像は、公開サイトに出るまで1〜2分かかります。
+ */
+Wiki.register("page-background", function (api) {
+  api.loadCss("plugin.css");
+
+  function safeUrl(v) {
+    v = String(v || "").trim();
+    if (/^https:\/\/[^\s"'()\\<>]+$/.test(v)) return v;
+    if (/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(v) && v.indexOf("..") < 0) return v;
+    return "";
+  }
+  function num(v, min, max, def) {
+    var n = parseInt(v, 10);
+    return isNaN(n) ? def : Math.max(min, Math.min(max, n));
+  }
+  var site = { img: safeUrl(api.options.image), opacity: num(api.options.opacity, 40, 100, 88) };
+
+  function apply(img, opacity) {
+    var bg = document.getElementById("wiki-bg");
+    if (!img) {
+      if (bg) bg.remove();
+      document.body.classList.remove("has-bg");
+      return;
+    }
+    if (!bg) {
+      bg = document.createElement("div");
+      bg.id = "wiki-bg";
+      document.body.insertBefore(bg, document.body.firstChild);
+    }
+    bg.style.backgroundImage = 'url("' + img + '")';
+    document.body.classList.add("has-bg");
+    document.body.style.setProperty("--bg-panel", (opacity / 100).toFixed(2));
+  }
+
+  return {
+    markdown: function (md) {
+      return md.replace(/```background[ \t]*\r?\n([\s\S]*?)```/g, function (_, body) {
+        var o = {};
+        body.split(/\r?\n/).forEach(function (l) {
+          var m = l.match(/^\s*([^:：]+)[:：]\s*(.*)$/);
+          if (m) o[m[1].trim()] = m[2].trim();
+        });
+        var none = /^(なし|none)$/i.test(o["画像"] || "");
+        return '\n\n<div class="bg-set" hidden data-none="' + (none ? "1" : "") + '" data-img="' + api.esc(safeUrl(o["画像"])) +
+          '" data-op="' + num(o["不透明度"], 40, 100, site.opacity) + '"></div>\n\n';
+      });
+    },
+    html: function (el, ctx) {
+      if (ctx && ctx.where === "preview") return; // 編集中のプレビューでは、背景を変えない
+      var set = el.querySelector(".bg-set");
+      if (set) {
+        if (set.getAttribute("data-none")) apply("", 0);
+        else apply(safeUrl(set.getAttribute("data-img")) || site.img, num(set.getAttribute("data-op"), 40, 100, site.opacity));
+      } else {
+        apply(site.img, site.opacity);
+      }
+    },
+    editor: function (ed) {
+      ed.addButton("背景", "このページの背景画像を決める", function () {
+        ed.insert("\n```background\n画像: images/\n不透明度: 88\n```\n");
+      });
+    }
+  };
+});
+
+})();
