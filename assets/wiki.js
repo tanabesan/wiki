@@ -40,7 +40,15 @@
     return null;
   }
   function hasRepo() { return !!cfg.repo; }
-  function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+  // トークンは半角の英数字と記号だけ。日本語などが混ざっていると、GitHubへの送信が必ず失敗する
+  var TOKEN_OK = /^[\x21-\x7e]+$/;
+  function getToken() {
+    try {
+      var t = localStorage.getItem(TOKEN_KEY) || "";
+      if (t && !TOKEN_OK.test(t)) { localStorage.removeItem(TOKEN_KEY); return ""; } // 壊れたトークンは捨てて、入力し直してもらう
+      return t;
+    } catch (e) { return ""; }
+  }
   function setToken(t) {
     try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
@@ -230,6 +238,14 @@
   function enhance(el, ctx) {
     el.querySelectorAll("table").forEach(function (t) { t.classList.add("data"); });
     runHook("html", function (h) { h(el, ctx); });
+    // 幅の広い表は、はみ出さずに表の中で横にスクロールできるよう、枠で包む(要約欄の表は対象外)
+    el.querySelectorAll("table.data").forEach(function (t) {
+      if (t.closest(".infobox") || (t.parentNode && t.parentNode.classList.contains("table-wrap"))) return;
+      var w = document.createElement("div");
+      w.className = "table-wrap";
+      t.parentNode.insertBefore(w, t);
+      w.appendChild(t);
+    });
   }
 
   /* ---------- GitHub API ---------- */
@@ -327,33 +343,60 @@
     } catch (e) {}
   }
 
+  /* ---------- アイコン(Google の Material Symbols) ---------- */
+  function icon(name, cls) {
+    if (!/^[a-z0-9_]+$/.test(name)) name = "article";
+    return '<span class="ms' + (cls ? " " + cls : "") + '" aria-hidden="true">' + name + "</span>";
+  }
+  // アイコンのフォントが実際に読み込めたときだけ、アイコンを見せる(読み込めないときは、代わりの文字を出す)
+  function watchIconFont() {
+    try {
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('24px "Material Symbols Rounded"', "home").then(function (f) {
+          if (f && f.length) document.documentElement.classList.add("ms-ready");
+        }, function () {});
+      }
+    } catch (e) {}
+  }
+
   /* ---------- 左メニューの開閉(☰ ボタン。開閉の状態はこのブラウザに覚える) ---------- */
   function buildSideToggle() {
     var layout = document.querySelector(".layout"), side = $("sidebar");
     if (!layout || !side || $("side-toggle")) return;
     var KEY = "wikiSideClosed";
+    var narrow = window.matchMedia("(max-width: 900px)");
     var closed;
     try {
       var saved = localStorage.getItem(KEY);
-      closed = saved === null ? window.matchMedia("(max-width: 800px)").matches : saved === "1";
-    } catch (e) { closed = false; }
+      closed = narrow.matches ? true : (saved === null ? false : saved === "1"); // 狭い画面では、いつも閉じた状態から始める
+    } catch (e) { closed = narrow.matches; }
     var btn = document.createElement("button");
     btn.id = "side-toggle";
     btn.type = "button";
     btn.className = "side-toggle";
-    btn.textContent = "☰";
+    btn.innerHTML = icon("menu") + '<span class="ms-fb" aria-hidden="true">☰</span>';
     btn.setAttribute("aria-controls", "sidebar");
+    var back = document.createElement("div");
+    back.className = "side-backdrop";
     function apply() {
       layout.classList.toggle("side-closed", closed);
       btn.setAttribute("aria-expanded", closed ? "false" : "true");
       btn.setAttribute("aria-label", closed ? "メニューを開く" : "メニューを閉じる");
       btn.title = closed ? "メニューを開く" : "メニューを閉じる";
     }
-    btn.addEventListener("click", function () {
-      closed = !closed;
+    function set(v, remember) {
+      closed = v;
       apply();
-      try { localStorage.setItem(KEY, closed ? "1" : "0"); } catch (e) {}
+      if (remember) { try { localStorage.setItem(KEY, closed ? "1" : "0"); } catch (e) {} }
+    }
+    btn.addEventListener("click", function () { set(!closed, !narrow.matches); });
+    back.addEventListener("click", function () { set(true, false); });
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && narrow.matches && !closed) set(true, false); });
+    // 狭い画面では、メニューのリンクを押したら、メニューを閉じる
+    side.addEventListener("click", function (ev) {
+      if (narrow.matches && ev.target.closest && ev.target.closest("a[href]")) set(true, false);
     });
+    document.body.appendChild(back);
     document.body.appendChild(btn);
     apply();
   }
@@ -362,8 +405,8 @@
   function buildSidebar() {
     var side = $("sidebar");
     if (!side) return;
-    var html = '<p class="site-title"><a href="index.html">' + esc(cfg.title || "Wiki") + "</a></p>";
-    html += '<div class="search"><input id="q" type="search" placeholder="ページを検索…" autocomplete="off">';
+    var html = '<a class="home" href="index.html">' + icon("home", "fill") + "ホーム</a>";
+    html += '<div class="search">' + icon("search") + '<input id="q" type="search" placeholder="ページを検索" aria-label="ページを検索" autocomplete="off">';
     html += '<ul id="results" class="search-results"></ul></div>';
     html += '<div id="side-plugins" class="side-plugins"></div><nav class="nav">';
     var cats = [];
@@ -378,8 +421,8 @@
     });
     html += "</nav>";
     if (hasRepo()) {
-      html += '<p class="side-foot"><a href="page.html?new=1">＋ 新しいページを作る</a>';
-      if (getToken()) html += '<br><a href="#" id="logout">編集トークンを削除</a>';
+      html += '<p class="side-foot"><a href="page.html?new=1">' + icon("add") + ' 新しいページを作る</a>';
+      if (getToken()) html += '<a href="#" id="logout">編集トークンを削除</a>';
       html += "</p>";
     }
     side.innerHTML = html;
@@ -434,8 +477,13 @@
     var grid = $("page-cards");
     if (!grid) return;
     grid.innerHTML = pages.map(function (p) {
-      return '<a class="card" href="' + href(p) + '"><strong>' + esc(p.title) + "</strong><span>" + esc(p.summary || "") + "</span></a>";
+      return '<a class="card" href="' + href(p) + '"><span class="arrow">' + icon("arrow_outward") + '</span><span class="ico">' +
+        icon(p.icon || "article") + "</span><strong>" + esc(p.title) + '</strong><span class="sum">' + esc(p.summary || "") + "</span></a>";
     }).join("");
+    var first = $("hero-first");
+    if (first) {
+      if (pages.length) first.href = href(pages[0]); else first.style.display = "none";
+    }
   }
 
   /* ---------- 画面部品 ---------- */
@@ -467,6 +515,12 @@
       ev.preventDefault();
       var v = $("tk").value.trim();
       if (!v) return;
+      if (!TOKEN_OK.test(v)) {
+        var m = $("tk-msg");
+        if (!m) { m = document.createElement("p"); m.id = "tk-msg"; m.className = "notice"; $("tk-form").after(m); }
+        m.textContent = "トークンに、日本語や全角の文字、空白が入っています。GitHubの画面に表示された「github_pat_」から始まる文字列だけを、そのままコピーして貼り付けてください。";
+        return;
+      }
       setToken(v);
       location.reload();
     });
@@ -718,6 +772,7 @@
     pages = cfg.pages || [];
     await loadPlugins(cfg.plugins, cfg.disabled);
     applyFreshMeta();
+    watchIconFont();
     buildSidebar();
     buildSideToggle();
     buildCards();
