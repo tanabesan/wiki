@@ -605,13 +605,35 @@
   }
 
   // プラグイン(editor フック)に渡す、ツールバーとテキスト操作の道具
-  function makeEditorApi(ta, savedCbs) {
+  function makeEditorApi(ta, savedCbs, ctrl) {
     var bar = $("ed-toolbar");
     function fire() { ta.dispatchEvent(new Event("input")); }
     return {
       textarea: ta,
       // 保存に成功したあとに呼ぶ関数を登録する(下書きの削除など)
       onSaved: function (fn) { savedCbs.push(fn); },
+      // 本文(Markdown)を取得する / 丸ごと置き換える
+      getText: function () { return ta.value; },
+      setText: function (v) { ta.value = v; fire(); },
+      // 「概要」タブに、見出し付きの入力欄のまとまりを足す。build(body) の body に、入力欄を作って入れる
+      addSection: function (title, build) {
+        var host = $("ed-sections");
+        var sec = document.createElement("section");
+        sec.className = "ed-section";
+        var h = document.createElement("h3");
+        h.textContent = title;
+        var body = document.createElement("div");
+        body.className = "ed-sec-body";
+        sec.appendChild(h);
+        sec.appendChild(body);
+        host.appendChild(sec);
+        build(body);
+        return sec;
+      },
+      // 「概要」タブを開いたときに呼ぶ関数を登録する(本文を読み直して、入力欄に反映するときに使う)
+      onOverview: function (fn) { ctrl.overviewCbs.push(fn); },
+      // 「概要」タブを開く
+      openOverview: function () { ctrl.show("overview"); },
       // 編集画面の下に出るメッセージ欄に、メッセージを出す(isErr が true なら赤字)
       status: function (msg, isErr) {
         var st = $("ed-status");
@@ -652,7 +674,12 @@
 
     var h = "<h1>" + (isNew ? "新しいページを作る" : esc(page.title) + " を編集") + "</h1>";
     h += isNew ? "" : tabs(page, "edit");
-    h += '<div class="editor"><div class="ed-fields">';
+    h += '<div class="editor" id="editor" data-tab="text">';
+    h += '<div class="ed-tabs" role="tablist">' +
+      '<button type="button" class="ed-tab" role="tab" data-t="text">' + icon("edit_note") + "本文</button>" +
+      '<button type="button" class="ed-tab ed-tab-preview" role="tab" data-t="preview">' + icon("visibility") + "プレビュー</button>" +
+      '<button type="button" class="ed-tab" role="tab" data-t="overview">' + icon("tune") + "概要</button></div>";
+    h += '<div class="ed-overview"><div class="ed-fields">';
     if (isNew) {
       h += '<label>ファイル名(slug)<input id="f-slug" type="text" placeholder="例: new-stage" value="' + esc(o.slug) + '"></label>';
     }
@@ -660,9 +687,9 @@
     h += '<label>カテゴリ<input id="f-cat" type="text" list="f-cats" value="' + esc(page ? page.category : "") + '"></label>';
     h += '<datalist id="f-cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join("") + "</datalist>";
     h += '<label>一言説明<input id="f-sum" type="text" value="' + esc(page ? page.summary || "" : "") + '"></label>';
-    h += '</div><div id="ed-toolbar" class="ed-toolbar"></div>';
-    h += '<div class="ed-grid"><textarea id="ed-text" spellcheck="false"></textarea>';
-    h += '<div class="preview"><div class="preview-label">プレビュー</div><div id="ed-preview"></div></div></div>';
+    h += '</div><div id="ed-sections"></div></div>';
+    h += '<div class="ed-main"><div class="ed-tx"><div id="ed-toolbar" class="ed-toolbar"></div><textarea id="ed-text" spellcheck="false"></textarea></div>';
+    h += '<div class="preview ed-pv"><div class="preview-label">プレビュー</div><div id="ed-preview"></div></div></div>';
     h += '<div class="ed-bar"><input id="ed-msg" type="text" placeholder="変更の要約(省略可)">';
     h += '<button class="btn" id="ed-save" type="button">保存する</button>';
     h += '<a href="' + esc(viewHref) + '">キャンセル</a><span id="ed-status" class="status"></span></div>';
@@ -678,9 +705,24 @@
     refresh();
 
     var savedCbs = [];
-    var ed = makeEditorApi(ta, savedCbs);
+    var editorEl = $("editor");
+    var ctrl = { overviewCbs: [], show: null };
+    ctrl.show = function (t) {
+      editorEl.setAttribute("data-tab", t);
+      Array.prototype.forEach.call(editorEl.querySelectorAll(".ed-tab"), function (b) {
+        b.setAttribute("aria-selected", b.getAttribute("data-t") === t ? "true" : "false");
+      });
+      if (t === "preview") { clearTimeout(timer); refresh(); }
+      if (t === "overview") ctrl.overviewCbs.forEach(function (fn) { try { fn(); } catch (err) { warn("概要タブの処理でエラー:", err); } });
+      if (t !== "text") window.scrollTo(0, 0);
+    };
+    Array.prototype.forEach.call(editorEl.querySelectorAll(".ed-tab"), function (b) {
+      b.addEventListener("click", function () { ctrl.show(b.getAttribute("data-t")); });
+    });
+    var ed = makeEditorApi(ta, savedCbs, ctrl);
     runHook("editor", function (hk) { hk(ed, { page: page, isNew: isNew }); });
 
+    ctrl.show("text");
     function setStatus(msg, isErr) {
       status.textContent = msg;
       status.className = "status" + (isErr ? " err" : "");
@@ -692,8 +734,8 @@
       var category = $("f-cat").value.trim() || "未分類";
       var summary = $("f-sum").value.trim();
       var text = ta.value;
-      if (isNew && !SLUG_RE.test(slug)) { setStatus("ファイル名は半角の小文字英数字とハイフンだけで入力してください(例: new-stage)", true); return; }
-      if (!title) { setStatus("ページ名を入力してください", true); return; }
+      if (isNew && !SLUG_RE.test(slug)) { ctrl.show("overview"); setStatus("ファイル名は半角の小文字英数字とハイフンだけで入力してください(例: new-stage)", true); $("f-slug").focus(); return; }
+      if (!title) { ctrl.show("overview"); setStatus("ページ名を入力してください", true); $("f-title").focus(); return; }
       var message = $("ed-msg").value.trim() || (isNew ? "ページを追加: " : "ページを編集: ") + title;
       var meta = { title: title, category: category, summary: summary, updated: today() };
 

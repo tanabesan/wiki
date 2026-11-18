@@ -17,6 +17,8 @@
  *   search(q)           検索結果を足す。[{ title, href, note }] を返す(Promiseも可)
  *   editor(ed, ctx)     編集画面のツールバーにボタンを足す(ed.addButton / ed.insert / ed.wrap)
  *                       ed.onSaved(fn) で、保存に成功した後に呼ぶ関数も登録できる
+ *                       ed.status(メッセージ, 赤字か) で、編集画面の下にメッセージを出せる
+ *                       ed.addSection(見出し, build) で、「概要」タブに入力欄を足せる(ed.getText / ed.setText / ed.onOverview / ed.pickImage も使える。実例は hero プラグイン)
  *   views               特別ページ page.html?view=名前 を追加する
  *
  * api の中身:
@@ -24,6 +26,7 @@
  *   api.pages()          ページ一覧(wiki-data.json の pages)
  *   api.findPage(名前)   slug かページ名でページを探す
  *   api.getText(slug)    ページ本文(Markdown)を取得する。Promise。取れなければ空文字
+ *   api.github           GitHubへの書き込み(編集者のトークンを使う): ready() / exists(path) / putBase64(path, base64, message) / explain(err)
  *   api.href(page)       ページのURL
  *   api.viewHref(名前)   特別ページのURL
  *   api.esc(文字列)      HTML用のエスケープ(外から来た文字をHTMLに入れるときは必ず通す)

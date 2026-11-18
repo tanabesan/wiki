@@ -593,6 +593,30 @@ Wiki.register("image-upload", function (api) {
 
       if (!api.github.ready()) return;
 
+      // 他のプラグイン(「概要」タブの入力欄など)から、画像を1枚選んで追加してもらうための入口。追加できたら cb(画像のパス) を呼ぶ
+      ed.pickImage = function (cb) {
+        var input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/png,image/jpeg,image/gif,image/webp";
+        input.addEventListener("change", async function () {
+          var f = input.files && input.files[0];
+          if (!f) return;
+          if (busy) { ed.status("前の画像を追加しています。少し待ってください", true); return; }
+          busy = true;
+          try {
+            ed.status("画像を追加中… " + (f.name || ""), false);
+            var r = await uploadOne(f);
+            ed.status("画像を追加しました: " + r.path + "。保存すると反映され、公開サイトでは1〜2分後に表示されます。", false);
+            cb(r.path);
+          } catch (e) {
+            ed.status("画像を追加できませんでした: " + (e.status ? api.github.explain(e) : e.message), true);
+          } finally {
+            busy = false;
+          }
+        });
+        input.click();
+      };
+
       ed.addButton("画像を追加", "画像を選んでGitHubに追加し、本文に挿入する", function () {
         var input = document.createElement("input");
         input.type = "file";
@@ -768,8 +792,108 @@ Wiki.register("hero", function (api) {
       });
     },
     editor: function (ed) {
-      ed.addButton("ヒーロー", "ページの上に画像つきバナーを入れる", function () {
-        ed.insert("\n```hero\n画像: images/\nタイトル: タイトル\n説明: 一言の説明\nボタン: 文字 | game-overview\n高さ: 260\n暗さ: 35\n```\n");
+      var RE = /```hero[ \t]*\r?\n[\s\S]*?```[ \t]*(\r?\n)?/;
+      function line(v) { return String(v || "").replace(/[\r\n]+/g, " ").trim(); }
+
+      function read() {
+        var m = ed.getText().match(RE), o = { on: !!m, img: "", title: "", sub: "", btns: [], h: 260, dim: 35 };
+        if (!m) return o;
+        m[0].split(/\r?\n/).forEach(function (l) {
+          var k = l.match(/^\s*([^:：]+)[:：]\s*(.*)$/);
+          if (!k) return;
+          var key = k[1].trim(), v = k[2].trim();
+          if (key === "画像") o.img = v; else if (key === "タイトル") o.title = v; else if (key === "説明") o.sub = v;
+          else if (key === "ボタン") { var p = v.split(/[|｜]/); o.btns.push([(p[0] || "").trim(), (p[1] || "").trim()]); }
+          else if (key === "高さ") o.h = num(v, 120, 600, 260); else if (key === "暗さ") o.dim = num(v, 0, 80, 35);
+        });
+        return o;
+      }
+      function write(o) {
+        var t = ed.getText();
+        if (!o.on) { ed.setText(t.replace(RE, "")); return; }
+        var b = "```hero\n";
+        if (o.img) b += "画像: " + o.img + "\n";
+        if (o.title) b += "タイトル: " + o.title + "\n";
+        if (o.sub) b += "説明: " + o.sub + "\n";
+        o.btns.forEach(function (x) { if (x[0]) b += "ボタン: " + x[0] + (x[1] ? " | " + x[1] : "") + "\n"; });
+        b += "高さ: " + o.h + "\n暗さ: " + o.dim + "\n```\n";
+        ed.setText(RE.test(t) ? t.replace(RE, function () { return b; }) : b + "\n" + t);
+      }
+
+      function field(label, input) {
+        var l = document.createElement("label");
+        l.appendChild(document.createTextNode(label));
+        l.appendChild(input);
+        return l;
+      }
+      function text(ph) { var i = document.createElement("input"); i.type = "text"; if (ph) i.placeholder = ph; return i; }
+      function range(min, max, step) {
+        var r = document.createElement("input"); r.type = "range"; r.min = min; r.max = max; r.step = step;
+        return r;
+      }
+
+      var sec = ed.addSection("ヒーロー(ページ上部のバナー)", function (body) {
+        var on = document.createElement("input"); on.type = "checkbox";
+        var onLabel = document.createElement("label"); onLabel.className = "ed-check";
+        onLabel.appendChild(on); onLabel.appendChild(document.createTextNode("このページの上にヒーローを表示する"));
+        var box = document.createElement("div");
+        var img = text("images/banner.png"), pick = document.createElement("button");
+        pick.type = "button"; pick.className = "btn ghost ed-small"; pick.textContent = "画像を選ぶ";
+        var pr = document.createElement("div"); pr.className = "ed-pick"; pr.appendChild(img); pr.appendChild(pick);
+        var title = text("ページのタイトルなど"), sub = text("一言の説明");
+        var datalist = document.createElement("datalist"); datalist.id = "hero-pages";
+        api.pages().forEach(function (pg) { var op = document.createElement("option"); op.value = pg.slug; op.label = pg.title; datalist.appendChild(op); });
+        var btnRows = [0, 1, 2].map(function () { return [text("ボタンの文字"), text("行き先(ページ名や https://…)")]; });
+        btnRows.forEach(function (r) { r[1].setAttribute("list", "hero-pages"); });
+        var h = range(120, 600, 10), hOut = document.createElement("output");
+        var d = range(0, 80, 5), dOut = document.createElement("output");
+
+        var row1 = document.createElement("div"); row1.className = "ed-row one"; row1.appendChild(field("背景の画像", pr));
+        var row2 = document.createElement("div"); row2.className = "ed-row"; row2.appendChild(field("タイトル", title)); row2.appendChild(field("説明", sub));
+        box.appendChild(row1); box.appendChild(row2); box.appendChild(datalist);
+        btnRows.forEach(function (r, i) {
+          var row = document.createElement("div"); row.className = "ed-row";
+          row.appendChild(field("ボタン " + (i + 1), r[0])); row.appendChild(field("行き先", r[1])); box.appendChild(row);
+        });
+        function rg(label, input, out, unit) {
+          var w = document.createElement("label"); w.className = "ed-range";
+          w.appendChild(document.createTextNode(label)); w.appendChild(input); w.appendChild(out); return w;
+        }
+        var row3 = document.createElement("div"); row3.className = "ed-row";
+        row3.appendChild(rg("高さ", h, hOut)); row3.appendChild(rg("暗さ", d, dOut));
+        box.appendChild(row3);
+        var note = document.createElement("p"); note.className = "ed-note";
+        note.textContent = "画像を決めないときは、色のグラデーションになります。暗さは、画像の上に重ねる黒の濃さです。";
+        box.appendChild(note);
+        body.appendChild(onLabel); body.appendChild(box);
+
+        var busy = false;
+        function show(o) {
+          if (busy) return;
+          on.checked = o.on; box.hidden = !o.on;
+          img.value = o.img; title.value = o.title; sub.value = o.sub;
+          btnRows.forEach(function (r, i) { r[0].value = (o.btns[i] || ["", ""])[0]; r[1].value = (o.btns[i] || ["", ""])[1]; });
+          h.value = o.h; d.value = o.dim; hOut.textContent = o.h + "px"; dOut.textContent = o.dim + "%";
+        }
+        function collect() {
+          hOut.textContent = h.value + "px"; dOut.textContent = d.value + "%";
+          box.hidden = !on.checked;
+          return { on: on.checked, img: line(img.value), title: line(title.value), sub: line(sub.value),
+            btns: btnRows.map(function (r) { return [line(r[0].value), line(r[1].value)]; }), h: num(h.value, 120, 600, 260), dim: num(d.value, 0, 80, 35) };
+        }
+        body.addEventListener("input", function () { write(collect()); });
+        body.addEventListener("change", function () { write(collect()); });
+        pick.addEventListener("click", function () {
+          if (!ed.pickImage) { ed.status("画像を選ぶには、image-upload プラグインが有効で、編集のトークンが設定されている必要があります", true); return; }
+          ed.pickImage(function (path) { img.value = path; write(collect()); });
+        });
+        ed.onOverview(function () { show(read()); });
+        show(read());
+      });
+
+      ed.addButton("ヒーロー", "「概要」タブで、ページ上部のバナーを設定する", function () {
+        ed.openOverview();
+        sec.scrollIntoView({ block: "start" });
       });
     }
   };
@@ -852,8 +976,74 @@ Wiki.register("page-background", function (api) {
       }
     },
     editor: function (ed) {
-      ed.addButton("背景", "このページの背景画像を決める", function () {
-        ed.insert("\n```background\n画像: images/\n不透明度: 88\n```\n");
+      var RE = /```background[ \t]*\r?\n[\s\S]*?```[ \t]*(\r?\n)?/;
+      function line(v) { return String(v || "").replace(/[\r\n]+/g, " ").trim(); }
+      // mode: "site"(サイト全体の設定を使う) / "custom"(このページだけ画像を指定) / "none"(このページは背景なし)
+      function read() {
+        var m = ed.getText().match(RE), o = { mode: "site", img: "", op: site.opacity };
+        if (!m) return o;
+        o.mode = "custom";
+        m[0].split(/\r?\n/).forEach(function (l) {
+          var k = l.match(/^\s*([^:：]+)[:：]\s*(.*)$/);
+          if (!k) return;
+          var key = k[1].trim(), v = k[2].trim();
+          if (key === "画像") { if (/^(なし|none)$/i.test(v)) o.mode = "none"; else o.img = v; }
+          else if (key === "不透明度") o.op = num(v, 40, 100, site.opacity);
+        });
+        return o;
+      }
+      function write(o) {
+        var t = ed.getText();
+        if (o.mode === "site") { ed.setText(t.replace(RE, "")); return; }
+        var b = "```background\n" + (o.mode === "none" ? "画像: なし\n" : (o.img ? "画像: " + o.img + "\n" : "") + "不透明度: " + o.op + "\n") + "```\n";
+        ed.setText(RE.test(t) ? t.replace(RE, function () { return b; }) : b + "\n" + t);
+      }
+
+      var sec = ed.addSection("背景画像", function (body) {
+        var sel = document.createElement("select");
+        [["site", site.img ? "サイト全体の背景を使う" : "背景なし(サイト全体の設定)"], ["custom", "このページだけ、画像を指定する"], ["none", "このページは、背景を消す"]].forEach(function (x) {
+          var op = document.createElement("option"); op.value = x[0]; op.textContent = x[1]; sel.appendChild(op);
+        });
+        sel.className = "ed-select";
+        var selLabel = document.createElement("label"); selLabel.appendChild(document.createTextNode("背景")); selLabel.appendChild(sel);
+        var box = document.createElement("div");
+        var img = document.createElement("input"); img.type = "text"; img.placeholder = "images/bg.png";
+        var pick = document.createElement("button"); pick.type = "button"; pick.className = "btn ghost ed-small"; pick.textContent = "画像を選ぶ";
+        var pr = document.createElement("div"); pr.className = "ed-pick"; pr.appendChild(img); pr.appendChild(pick);
+        var imgLabel = document.createElement("label"); imgLabel.appendChild(document.createTextNode("背景の画像")); imgLabel.appendChild(pr);
+        var op = document.createElement("input"); op.type = "range"; op.min = 40; op.max = 100; op.step = 1;
+        var out = document.createElement("output");
+        var opLabel = document.createElement("label"); opLabel.className = "ed-range";
+        opLabel.appendChild(document.createTextNode("本文の板の濃さ")); opLabel.appendChild(op); opLabel.appendChild(out);
+        var note = document.createElement("p"); note.className = "ed-note";
+        note.textContent = "小さくするほど背景が透けますが、文字は読みにくくなります。";
+        var r1 = document.createElement("div"); r1.className = "ed-row one"; r1.appendChild(imgLabel);
+        var r2 = document.createElement("div"); r2.className = "ed-row one"; r2.appendChild(opLabel);
+        box.appendChild(r1); box.appendChild(r2); box.appendChild(note);
+        var r0 = document.createElement("div"); r0.className = "ed-row one"; r0.appendChild(selLabel);
+        body.appendChild(r0); body.appendChild(box);
+
+        function show(o) {
+          sel.value = o.mode; box.hidden = o.mode !== "custom";
+          img.value = o.img; op.value = o.op; out.textContent = o.op + "%";
+        }
+        function collect() {
+          out.textContent = op.value + "%"; box.hidden = sel.value !== "custom";
+          return { mode: sel.value, img: line(img.value), op: num(op.value, 40, 100, site.opacity) };
+        }
+        body.addEventListener("input", function () { write(collect()); });
+        body.addEventListener("change", function () { write(collect()); });
+        pick.addEventListener("click", function () {
+          if (!ed.pickImage) { ed.status("画像を選ぶには、image-upload プラグインが有効で、編集のトークンが設定されている必要があります", true); return; }
+          ed.pickImage(function (path) { img.value = path; sel.value = "custom"; box.hidden = false; write(collect()); });
+        });
+        ed.onOverview(function () { show(read()); });
+        show(read());
+      });
+
+      ed.addButton("背景", "「概要」タブで、このページの背景を設定する", function () {
+        ed.openOverview();
+        sec.scrollIntoView({ block: "start" });
       });
     }
   };
