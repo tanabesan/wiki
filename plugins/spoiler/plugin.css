@@ -1,2 +1,0 @@
-.spoiler { background: var(--text); color: var(--text); border-radius: 3px; padding: 0 4px; cursor: pointer; }
-.spoiler.open { background: transparent; }

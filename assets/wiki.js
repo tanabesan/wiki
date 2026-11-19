@@ -538,6 +538,18 @@
   }
 
   /* ---------- 閲覧 ---------- */
+  // 本文の先頭にヒーローがあるときは、ヒーローをページの一番上に出す。
+  // ページ名がヒーローのタイトルと同じなら、ページ名の大見出しは見えなくする(読み上げ用には残す)ので、タイトルが二重に出ない
+  function liftHero(box, body, page) {
+    var hero = body.firstElementChild;
+    if (!hero || !hero.classList.contains("hero")) return;
+    box.insertBefore(hero, box.firstChild);
+    box.classList.add("has-hero");
+    var t = hero.querySelector(".hero-title");
+    var h1 = box.querySelector("h1");
+    if (h1 && t && t.textContent.trim() === page.title.trim()) h1.classList.add("sr-only");
+  }
+
   async function viewPage(box, page) {
     document.title = page.title + " - " + (cfg.title || "Wiki");
     var head = "<h1>" + esc(page.title) + '</h1><p class="meta"><span class="tag">' + esc(page.category) + "</span>" +
@@ -555,7 +567,9 @@
       }
       var ctx = { page: page, where: "view" };
       box.innerHTML = head + notice + '<div class="page-body">' + render(md, ctx) + "</div>";
-      enhance(box.querySelector(".page-body"), ctx);
+      var body = box.querySelector(".page-body");
+      enhance(body, ctx);
+      liftHero(box, body, page);
     } catch (err) {
       var msg = err.status === 404 && hasRepo()
         ? "このページの本文はまだありません。上の「編集」から書き始められます。"
