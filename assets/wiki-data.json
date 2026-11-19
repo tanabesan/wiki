@@ -3,10 +3,21 @@
   "repo": "tanabesan/wiki",
   "branch": "main",
   "plugins": [
-   "infobox", "wikilinks", "spoiler", "callout",
-   "toc", "backlinks", "table-sort", "image-zoom", "external-links",
-   "fulltext-search", "recent-changes", "random-page", "dark-mode",
-    "editor-toolbar", "draft-autosave"
+    "infobox",
+    "wikilinks",
+    "spoiler",
+    "callout",
+    "toc",
+    "backlinks",
+    "table-sort",
+    "image-zoom",
+    "external-links",
+    "fulltext-search",
+    "recent-changes",
+    "random-page",
+    "dark-mode",
+    "editor-toolbar",
+    "draft-autosave"
   ],
   "pages": [
     {
@@ -84,6 +95,14 @@
         "辞書"
       ],
       "updated": "2026-11-10"
+    },
+    {
+      "slug": "nanto-naku",
+      "title": "テスト",
+      "category": "テスト",
+      "summary": "なんとなく",
+      "updated": "2026-11-19",
+      "keywords": []
     }
   ]
 }
