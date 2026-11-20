@@ -1,8 +1,7 @@
 ```hero
-画像: images/imagecity.png
-タイトル: テスト
-説明: なんとなく
-ボタン: よろ | https://tanabesan.github.io/wiki/
+画像: images/neoncity.png
+タイトル: Neon City
+説明: 27コース目のコース
 高さ: 260
 暗さ: 35
 ```
