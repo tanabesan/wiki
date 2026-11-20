@@ -156,7 +156,7 @@
         explain: apiErrorMessage
       },
       loadCss: function (file) {
-        if (!/^[A-Za-z0-9._-]+$/.test(file) || bundled[name]) return; // まとめ版の CSS は bundle.css で読み込み済み
+        if (!/^[A-Za-z0-9._-]+$/.test(file) || bundled[name]) return; // まとめ版の CSS は bundle.js の中
         var key = name + "/" + file;
         if (cssLoaded[key]) return;
         cssLoaded[key] = true;
@@ -188,11 +188,6 @@
       var off = {};
       (Array.isArray(disabled) ? disabled : []).forEach(function (n) { off[n] = true; });
       entries = normalizePlugins(l).filter(function (e) { return !off[e.name]; });
-      var link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "plugins/bundle.css";
-      cssPromises.push(new Promise(function (resolve) { link.onload = link.onerror = function () { resolve(); }; }));
-      document.head.appendChild(link);
     } else {
       entries = normalizePlugins(list);
     }
@@ -620,7 +615,7 @@
 
   // プラグイン(editor フック)に渡す、ツールバーとテキスト操作の道具
   /* ---------- 編集画面のモーダル(カテゴリのボタンを押すと開く) ---------- */
-  var CAT_ICONS = { "見出し": "title", "文字": "format_bold", "挿入": "add_box", "画像": "image", "ページ": "tune" };
+  var CAT_ICONS = { "見出し": "title", "文字": "format_bold", "挿入": "add_box", "リンク": "link", "画像": "image", "ページ": "tune" };
 
   function mk(tag, cls, text) {
     var e = document.createElement(tag);

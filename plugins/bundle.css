@@ -74,6 +74,19 @@ img.zoomable { cursor: zoom-in; }
 /* ===== external-links ===== */
 a.external::after { content: "↗"; font-size: 0.75em; margin-left: 2px; }
 
+/* ===== embed ===== */
+.embed { display: block; margin: 16px 0; }
+.embed-video { position: relative; aspect-ratio: 16 / 9; max-width: 640px; border-radius: var(--radius, 16px); overflow: hidden; background: #000; }
+.embed-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.embed-card { display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2, var(--panel)); color: var(--text); text-decoration: none; }
+.embed-card:hover { border-color: var(--accent); }
+.embed-card::after { content: none !important; }
+.embed-ico { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft, rgba(109,94,252,.14)); color: var(--accent); font-weight: 700; }
+.embed-x .embed-ico { background: #000; color: #fff; }
+.embed-tx { display: grid; gap: 2px; min-width: 0; }
+.embed-tx b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.embed-tx span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ===== dark-mode ===== */
 :root[data-theme="light"] {
   color-scheme: light;

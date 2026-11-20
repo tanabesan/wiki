@@ -323,6 +323,131 @@ Wiki.register("external-links", function (api) {
 });
 
 })();
+/* ===== embed ===== */
+(function () {
+/*
+ * embed: URLだけの行を、動画やリンクカードにする
+ *   YouTube(youtube.com / youtu.be)→ 動画プレーヤー
+ *   ニコニコ動画(nicovideo.jp / nico.ms)→ 動画プレーヤー
+ *   X(x.com / twitter.com)のポスト → リンクカード(ポストの埋め込みは外部スクリプトが必要なので、カードにしています)
+ *   {{カード: URL | タイトル}} → どのサイトでも使えるリンクカード(タイトルは省略可)
+ * 編集画面の「リンク」カテゴリから入れられます
+ */
+Wiki.register("embed", function (api) {
+  // スタイルはこのファイルの中に持つ(plugin.css は不要)
+  if (!document.getElementById("embed-style")) {
+    var st = document.createElement("style");
+    st.id = "embed-style";
+    st.textContent = ".embed { display: block; margin: 16px 0; }\n.embed-video { position: relative; aspect-ratio: 16 / 9; max-width: 640px; border-radius: var(--radius, 16px); overflow: hidden; background: #000; }\n.embed-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }\n.embed-card { display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2, var(--panel)); color: var(--text); text-decoration: none; }\n.embed-card:hover { border-color: var(--accent); }\n.embed-card::after { content: none !important; }\n.embed-ico { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft, rgba(109,94,252,.14)); color: var(--accent); font-weight: 700; }\n.embed-x .embed-ico { background: #000; color: #fff; }\n.embed-tx { display: grid; gap: 2px; min-width: 0; }\n.embed-tx b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.embed-tx span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }";
+    document.head.appendChild(st);
+  }
+
+  function parse(raw) {
+    var u;
+    try { u = new URL(raw); } catch (e) { return null; }
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    var h = u.hostname.replace(/^www\.|^m\./, ""), m;
+    if (h === "youtu.be") m = u.pathname.slice(1);
+    else if (h === "youtube.com") m = u.searchParams.get("v") || (u.pathname.match(/^\/(?:embed|shorts|live)\/([^/?]+)/) || [])[1];
+    if ((h === "youtu.be" || h === "youtube.com") && m && /^[\w-]{6,20}$/.test(m)) {
+      var t = parseInt(u.searchParams.get("t") || u.searchParams.get("start") || "0", 10) || 0;
+      return { kind: "youtube", id: m, start: t };
+    }
+    if (h === "nicovideo.jp" || h === "nico.ms") {
+      m = u.pathname.match(/\/((?:sm|nm|so)\d+)/) || (h === "nico.ms" && u.pathname.match(/\/((?:sm|nm|so)\d+)/));
+      if (m) return { kind: "nico", id: m[1] };
+    }
+    if (h === "x.com" || h === "twitter.com") {
+      m = u.pathname.match(/^\/([\w]{1,15})\/status\/(\d+)/);
+      if (m) return { kind: "x", user: m[1], id: m[2], url: "https://x.com/" + m[1] + "/status/" + m[2] };
+    }
+    return null;
+  }
+
+  function ph(attrs) {
+    return '\n\n<div class="embed-ph"' + Object.keys(attrs).map(function (k) {
+      return " data-" + k + '="' + api.esc(String(attrs[k])) + '"';
+    }).join("") + "></div>\n\n";
+  }
+
+  return {
+    markdown: function (md) {
+      // コードブロックの中は触らない
+      var parts = md.split(/(```[\s\S]*?```)/);
+      return parts.map(function (part, i) {
+        if (i % 2) return part;
+        part = part.replace(/^\{\{カード[:：][ \t]*(https?:\/\/[^\s|｜}]+)[ \t]*(?:[|｜][ \t]*([^}\n]*?))?[ \t]*\}\}[ \t]*$/gm, function (_, url, title) {
+          return ph({ kind: "card", url: url, title: title || "" });
+        });
+        return part.replace(/^[ \t]*<?(https?:\/\/[^\s<>]+)>?[ \t]*$/gm, function (all, url) {
+          var p = parse(url);
+          if (!p) return all;
+          p.url = p.url || url;
+          return ph(p);
+        });
+      }).join("");
+    },
+    html: function (el) {
+      el.querySelectorAll(".embed-ph").forEach(function (n) {
+        var d = n.dataset, box = document.createElement("div");
+        if (d.kind === "youtube" || d.kind === "nico") {
+          box.className = "embed embed-video";
+          var f = document.createElement("iframe");
+          f.src = d.kind === "youtube"
+            ? "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(d.id) + (Number(d.start) ? "?start=" + Number(d.start) : "")
+            : "https://embed.nicovideo.jp/watch/" + encodeURIComponent(d.id);
+          f.title = d.kind === "youtube" ? "YouTube の動画" : "ニコニコ動画";
+          f.loading = "lazy";
+          f.allowFullscreen = true;
+          f.setAttribute("allow", "fullscreen; picture-in-picture");
+          f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+          box.appendChild(f);
+        } else {
+          var url = d.url || "";
+          var host;
+          try { host = new URL(url).hostname.replace(/^www\./, ""); } catch (e) { n.remove(); return; }
+          var a = document.createElement("a");
+          a.className = "embed embed-card" + (d.kind === "x" ? " embed-x" : "");
+          a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+          var t1 = d.kind === "x" ? "@" + d.user + " のポスト" : (d.title || host);
+          var t2 = d.kind === "x" ? "X で見る  ·  " + host : url;
+          var b = document.createElement("b"); b.textContent = t1;
+          var s = document.createElement("span"); s.textContent = t2;
+          var ico = document.createElement("span");
+          ico.className = "embed-ico"; ico.textContent = d.kind === "x" ? "𝕏" : "↗";
+          a.appendChild(ico);
+          var tx = document.createElement("span"); tx.className = "embed-tx";
+          tx.appendChild(b); tx.appendChild(s); a.appendChild(tx);
+          box = a;
+        }
+        n.replaceWith(box);
+      });
+    },
+    editor: function (ed) {
+      ed.addItem("リンク", {
+        label: "動画・ポスト", hint: "YouTube / ニコニコ動画 / X のURLを貼る", icon: "smart_display",
+        fields: [{ name: "url", label: "URL", type: "text", required: true, placeholder: "https://www.youtube.com/watch?v=…" }],
+        run: function (v) {
+          if (!parse(v.url)) { ed.status("対応していないURLです(YouTube・ニコニコ動画・Xのポスト)。リンクカードを使ってください", true); return; }
+          ed.insert("\n\n" + v.url + "\n\n");
+        }
+      });
+      ed.addItem("リンク", {
+        label: "リンクカード", hint: "どのサイトでも、カード状のリンクにする", icon: "link",
+        fields: [
+          { name: "url", label: "URL", type: "text", required: true, placeholder: "https://" },
+          { name: "title", label: "タイトル(空ならサイト名)", type: "text" }
+        ],
+        run: function (v) {
+          if (!/^https?:\/\/\S+$/.test(v.url)) { ed.status("URLは http:// か https:// で始めてください", true); return; }
+          ed.insert("\n\n{{カード: " + v.url + (v.title ? " | " + v.title : "") + "}}\n\n");
+        }
+      });
+    }
+  };
+});
+
+})();
 /* ===== fulltext-search ===== */
 (function () {
 /*
@@ -1144,4 +1269,11 @@ Wiki.register("page-background", function (api) {
   };
 });
 
+})();
+/* ===== スタイル ===== */
+(function () {
+  var s = document.createElement("style");
+  s.id = "wiki-bundle-style";
+  s.textContent = "/* ===== infobox ===== */\n.infobox {\n  float: right; width: 280px; margin: 0 0 16px 24px;\n  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);\n  overflow: hidden; font-size: 0.9rem;\n}\n.infobox .ib-title { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; padding: 8px 12px; font-weight: 700; text-align: center; }\n.infobox .ib-img { background: var(--accent-soft); color: var(--muted); text-align: center; padding: 40px 0; font-size: 0.8rem; }\n.infobox img { display: block; width: 100%; }\n.infobox table { width: 100%; border-collapse: collapse; }\n.infobox th, .infobox td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }\n.infobox th { width: 38%; color: var(--muted); font-weight: 500; }\n@media (max-width: 800px) {\n  .infobox { float: none; width: 100%; margin: 0 0 20px; }\n}\n\n/* ===== wikilinks ===== */\n.missing { color: var(--muted); border-bottom: 1px dotted var(--muted); cursor: help; }\n\n/* ===== spoiler ===== */\n.spoiler { background: var(--text); color: var(--text); border-radius: 6px; padding: 1px 8px; cursor: pointer; }\n.spoiler.open { background: transparent; }\n\n/* ===== callout ===== */\n.callout {\n  --c: #3b82f6; position: relative; overflow: hidden; margin: 1.2em 0; padding: 6px 18px 8px 22px;\n  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);\n}\n.callout::before { content: \"\"; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }\n.callout-title { font-weight: 700; margin-top: 6px; color: var(--c); }\n.callout > p:last-child { margin-bottom: 6px; }\n.callout-note   { --c: #6b7280; }\n.callout-info   { --c: #3b82f6; }\n.callout-tip    { --c: #12a594; }\n.callout-warn   { --c: #e5930a; }\n.callout-danger { --c: #d6455d; }\n\n/* ===== toc ===== */\n.toc {\n  display: inline-block; min-width: 240px; max-width: 100%;\n  margin: 1em 0; padding: 14px 20px 16px;\n  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);\n  font-size: 0.9rem;\n}\n.toc-title { font-size: 0.75rem; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; margin-bottom: 4px; }\n.toc ol { list-style: none; margin: 0; padding: 0; line-height: 1.9; }\n.toc .l3 { padding-left: 1.4em; font-size: 0.95em; }\n.toc a { color: var(--accent); }\n.toc .l4 { padding-left: 2.8em; font-size: 0.92em; }\n.toc-hint { margin: 1em 0; padding: 10px 16px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); font-size: 0.85rem; }\n\n/* ===== backlinks ===== */\n.backlinks {\n  clear: both; margin-top: 3em; padding: 10px 18px 12px;\n  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); font-size: 0.9rem;\n}\n.backlinks-title { font-weight: 700; margin-bottom: 4px; }\n.backlinks ul { margin: 0; padding-left: 1.2em; }\n\n/* ===== table-sort ===== */\nth.sortable { cursor: pointer; user-select: none; white-space: nowrap; }\nth.sortable::after { content: \" ↕\"; color: var(--muted); font-size: 0.8em; }\nth.sortable[data-sort=\"asc\"]::after { content: \" ▲\"; color: var(--accent); }\nth.sortable[data-sort=\"desc\"]::after { content: \" ▼\"; color: var(--accent); }\n\n/* ===== image-zoom ===== */\nimg.zoomable { cursor: zoom-in; }\n.zoom-overlay {\n  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;\n  background: rgba(0, 0, 0, 0.82); cursor: zoom-out;\n}\n.zoom-overlay img { max-width: 94vw; max-height: 94vh; object-fit: contain; }\n\n/* ===== external-links ===== */\na.external::after { content: \"↗\"; font-size: 0.75em; margin-left: 2px; }\n\n/* ===== dark-mode ===== */\n:root[data-theme=\"light\"] {\n  color-scheme: light;\n  --bg: #f7f7fb;\n  --panel: #ffffff;\n  --surface-2: #f1f1f8;\n  --text: #14131c;\n  --muted: #6b6b80;\n  --line: rgba(20, 19, 28, 0.1);\n  --accent: #6d5efc;\n  --accent-soft: rgba(109, 94, 252, 0.1);\n  --danger: #d6455d;\n  --shadow: 0 1px 2px rgba(20, 19, 28, 0.05), 0 8px 24px -12px rgba(20, 19, 28, 0.12);\n}\n:root[data-theme=\"dark\"] {\n  color-scheme: dark;\n  --bg: #0d0c14;\n  --panel: #16151f;\n  --surface-2: #1e1d2a;\n  --text: #f1f0f8;\n  --muted: #9c9ab0;\n  --line: rgba(255, 255, 255, 0.09);\n  --accent: #8b7dff;\n  --accent-soft: rgba(139, 125, 255, 0.15);\n  --danger: #ff7d92;\n  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.6);\n}\n\n/* ===== hero ===== */\n.hero {\n  position: relative; display: flex; align-items: flex-end; margin: 0 0 28px;\n  border-radius: 12px; overflow: hidden; color: #fff;\n  background-size: cover; background-position: center; background-color: var(--accent);\n}\n.hero.hero-plain { background-image: linear-gradient(135deg, var(--accent), #2b2b2b); }\n.hero-inner { padding: 28px 32px; max-width: 100%; }\n.hero-title { font-size: 2rem; font-weight: 800; line-height: 1.3; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45); }\n.hero-sub { margin-top: 6px; font-size: 1.05rem; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); }\n.hero-btns { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }\n.hero-btn {\n  display: inline-block; padding: 8px 18px; border-radius: 999px; font-weight: 600;\n  background: #fff; color: #222; text-decoration: none;\n}\n.hero-btn:hover { background: var(--accent-soft); color: var(--accent); text-decoration: none; }\n@media (max-width: 800px) {\n  .hero-inner { padding: 20px 18px; }\n  .hero-title { font-size: 1.5rem; }\n}\n\n/* ===== page-background ===== */\n#wiki-bg {\n  position: fixed; inset: 0; z-index: -1; pointer-events: none;\n  background-size: cover; background-position: center; background-repeat: no-repeat;\n}\nbody.has-bg { background: transparent; }\nbody.has-bg main {\n  background: color-mix(in srgb, var(--bg) calc(var(--bg-panel, 0.88) * 100%), transparent);\n  border-radius: 0;\n}\n.bg-set { display: none; }\n";
+  document.head.appendChild(s);
 })();
