@@ -86,6 +86,17 @@ Wiki.register("callout", function (api) {
   api.loadCss("plugin.css");
   var names = { note: "補足", info: "情報", tip: "ヒント", warn: "注意", danger: "警告" };
   return {
+    editor: function (ed) {
+      ed.addItem("挿入", {
+        label: "囲み(補足・注意など)", hint: ":::種類 で囲む", icon: "info",
+        fields: [
+          { name: "type", label: "種類", type: "select", value: "note", options: [["note", "補足"], ["info", "情報"], ["tip", "ヒント"], ["warn", "注意"], ["danger", "警告"]] },
+          { name: "title", label: "タイトル(空なら種類の名前)", type: "text" },
+          { name: "body", label: "本文", type: "textarea", required: true }
+        ],
+        run: function (v) { ed.insert("\n:::" + v.type + (v.title ? " " + v.title : "") + "\n" + v.body + "\n:::\n"); }
+      });
+    },
     markdown: function (md) {
       return md.replace(/^:::(note|info|tip|warn|danger)[ \t]*([^\n]*)\r?\n([\s\S]*?)\r?\n:::[ \t]*$/gm,
         function (_, type, title, body) {
@@ -101,42 +112,67 @@ Wiki.register("callout", function (api) {
 /* ===== toc ===== */
 (function () {
 /*
- * toc: 見出し(##, ###)が一定数以上あるページの、最初の見出しの前に目次を入れる
+ * toc: 見出し(##, ###, ####)から目次を作る
+ *
+ *   ・見出しが一定数以上あるページでは、最初の見出しの前に、自動で目次が入ります
+ *   ・好きな場所に入れたいときは、本文に {{目次}} と1行で書きます(見出しが少なくても出ます。編集画面の「目次」ボタンでも入ります)
+ *   ・このページには目次を出したくないときは、本文に {{目次なし}} と1行で書きます
+ *
  * 設定(wiki-data.json): { "name": "toc", "options": { "minHeadings": 3 } }
  */
 Wiki.register("toc", function (api) {
   api.loadCss("plugin.css");
   var min = Number(api.options.minHeadings) || 3;
+
+  function build(heads) {
+    var nav = document.createElement("nav");
+    nav.className = "toc";
+    var title = document.createElement("div");
+    title.className = "toc-title";
+    title.textContent = "目次";
+    nav.appendChild(title);
+    var ol = document.createElement("ol");
+    nav.appendChild(ol);
+
+    var n2 = 0, n3 = 0, n4 = 0;
+    heads.forEach(function (h, i) {
+      h.id = "sec-" + (i + 1);
+      var num, cls;
+      if (h.tagName === "H2") { n2++; n3 = 0; n4 = 0; num = String(n2); cls = "l2"; }
+      else if (h.tagName === "H3") { n3++; n4 = 0; num = (n2 || 1) + "." + n3; cls = "l3"; }
+      else { n4++; num = (n2 || 1) + "." + (n3 || 1) + "." + n4; cls = "l4"; }
+      var li = document.createElement("li");
+      li.className = cls;
+      var a = document.createElement("a");
+      a.href = "#" + h.id;
+      a.textContent = num + " " + h.textContent;
+      li.appendChild(a);
+      ol.appendChild(li);
+    });
+    return nav;
+  }
+
   return {
+    markdown: function (md) {
+      return md
+        .replace(/^[ \t]*\{\{(?:目次|toc)\}\}[ \t]*$/gm, '\n\n<div class="toc-here"></div>\n\n')
+        .replace(/^[ \t]*\{\{(?:目次なし|notoc)\}\}[ \t]*$/gm, '\n\n<div class="toc-none"></div>\n\n');
+    },
     html: function (el, ctx) {
-      if (ctx.where !== "view") return;
-      var heads = el.querySelectorAll("h2, h3");
+      var here = el.querySelector(".toc-here"), none = el.querySelector(".toc-none");
+      if (none) none.remove();
+      if (ctx.where !== "view") { // 編集中のプレビューでは、目次の場所だけ示す
+        if (here) { here.className = "toc-hint"; here.textContent = "ここに目次が入ります"; }
+        return;
+      }
+      var heads = el.querySelectorAll("h2, h3, h4");
+      if (none) { if (here) here.remove(); return; }
+      if (here) {
+        if (heads.length) here.parentNode.replaceChild(build(heads), here); else here.remove();
+        return;
+      }
       if (heads.length < min) return;
-
-      var nav = document.createElement("nav");
-      nav.className = "toc";
-      var title = document.createElement("div");
-      title.className = "toc-title";
-      title.textContent = "目次";
-      nav.appendChild(title);
-      var ol = document.createElement("ol");
-      nav.appendChild(ol);
-
-      var n2 = 0, n3 = 0;
-      heads.forEach(function (h, i) {
-        h.id = "sec-" + (i + 1);
-        var num;
-        if (h.tagName === "H2") { n2++; n3 = 0; num = String(n2); }
-        else { n3++; num = (n2 || 1) + "." + n3; }
-        var li = document.createElement("li");
-        li.className = h.tagName === "H2" ? "l2" : "l3";
-        var a = document.createElement("a");
-        a.href = "#" + h.id;
-        a.textContent = num + " " + h.textContent;
-        li.appendChild(a);
-        ol.appendChild(li);
-      });
-      heads[0].parentNode.insertBefore(nav, heads[0]);
+      heads[0].parentNode.insertBefore(build(heads), heads[0]);
     }
   };
 });
@@ -439,19 +475,78 @@ Wiki.register("dark-mode", function (api) {
 })();
 /* ===== editor-toolbar ===== */
 (function () {
-/* editor-toolbar: 編集画面に、記法を挿入するボタンを並べる */
+/*
+ * editor-toolbar: 編集画面に、記法を挿入するボタンを並べる
+ * カテゴリ(見出し/文字/挿入)のボタンを押すと、モーダルで機能を選べる。入力が要る機能(リンク・表・要約欄)はモーダルで入力する
+ *   大見出し / 中見出し / 小見出し: カーソルのある行(選んだ行すべて)を見出しにする。同じボタンをもう一度押すと、ふつうの文に戻る
+ *   目次: カーソルの位置に {{目次}} を入れる(その場所に目次が出る。toc プラグインが有効なとき)
+ */
 Wiki.register("editor-toolbar", function (api) {
   return {
     editor: function (ed) {
-      ed.addButton("見出し", "見出しを挿入", function () { ed.wrap("\n## ", "\n", "見出し"); });
-      ed.addButton("太字", "選択部分を太字に", function () { ed.wrap("**", "**", "太字"); });
-      ed.addButton("リンク", "ページへのリンク [[ ]]", function () { ed.wrap("[[", "]]", "ページ名"); });
-      ed.addButton("表", "表を挿入", function () {
-        ed.insert("\n| 列1 | 列2 |\n|-----|-----|\n| 内容 | 内容 |\n");
+      // 選んだ行(未選択ならカーソルの行)の見出しの段階を、level に変える。同じ段階なら、見出しをやめる
+      function heading(level) {
+        var ta = ed.textarea, v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+        var ls = v.lastIndexOf("\n", s - 1) + 1;
+        var le = v.indexOf("\n", e > s ? e - 1 : e);
+        if (le < 0) le = v.length;
+        var lines = v.slice(ls, le).split("\n");
+        var mark = new Array(level + 1).join("#");
+        var out = lines.map(function (line) {
+          var m = line.match(/^(#{1,6})[ \t]+(.*)$/);
+          var cur = m ? m[1].length : 0, text = m ? m[2] : line.trim();
+          if (!text && !m) return mark + " 見出し";
+          if (cur === level) return text;
+          return mark + " " + text;
+        }).join("\n");
+        ta.setRangeText(out, ls, le, "end");
+        ta.dispatchEvent(new Event("input"));
+      }
+
+      ed.addItem("見出し", { label: "大見出し", hint: "## もう一度選ぶと元に戻る", icon: "title", run: function () { heading(2); } });
+      ed.addItem("見出し", { label: "中見出し", hint: "### もう一度選ぶと元に戻る", icon: "format_h3", run: function () { heading(3); } });
+      ed.addItem("見出し", { label: "小見出し", hint: "#### もう一度選ぶと元に戻る", icon: "format_h4", run: function () { heading(4); } });
+      ed.addItem("見出し", { label: "目次", hint: "この位置に {{目次}} を入れる", icon: "toc", run: function () { ed.insert("\n{{目次}}\n"); } });
+
+      ed.addItem("文字", { label: "太字", hint: "選択部分を **太字** に", icon: "format_bold", run: function () { ed.wrap("**", "**", "太字"); } });
+      ed.addItem("文字", { label: "ネタバレ", hint: "選択部分を伏せ字に ||  ||", icon: "visibility_off", run: function () { ed.wrap("||", "||", "ネタバレ"); } });
+      ed.addItem("文字", {
+        label: "ページへのリンク", hint: "[[ページ名]] を入れる", icon: "link", submitLabel: "挿入する",
+        fields: [
+          { name: "page", label: "リンク先のページ(slug か名前)", type: "page", required: true },
+          { name: "text", label: "表示する文字(空なら、そのまま)", type: "text" }
+        ],
+        run: function (v) { ed.insert("[[" + v.page + (v.text ? "|" + v.text : "") + "]]"); }
       });
-      ed.addButton("ネタバレ", "ネタバレの伏せ字 || ||", function () { ed.wrap("||", "||", "ネタバレ"); });
-      ed.addButton("要約欄", "インフォボックスを挿入", function () {
-        ed.insert("\n```infobox\n名前\n画像:\n項目1: 内容\n項目2: 内容\n```\n");
+
+      ed.addItem("挿入", {
+        label: "表", hint: "列と行の数を決めて表を入れる", icon: "table_chart",
+        fields: [
+          { name: "cols", label: "列の数", type: "number", value: 2, min: 1, max: 12, required: true },
+          { name: "rows", label: "行の数(見出し行を除く)", type: "number", value: 2, min: 1, max: 50, required: true }
+        ],
+        run: function (v) {
+          var c = Math.max(1, Math.min(12, Math.round(v.cols))), r = Math.max(1, Math.min(50, Math.round(v.rows)));
+          var row = function (t) { var a = []; for (var i = 1; i <= c; i++) a.push(t === "h" ? "列" + i : t === "s" ? "-----" : "内容"); return "| " + a.join(" | ") + " |"; };
+          var lines = [row("h"), row("s")];
+          for (var k = 0; k < r; k++) lines.push(row("c"));
+          ed.insert("\n" + lines.join("\n") + "\n");
+        }
+      });
+      ed.addItem("挿入", {
+        label: "要約欄(インフォボックス)", hint: "名前・画像・項目を入れる", icon: "article",
+        fields: [
+          { name: "name", label: "名前", type: "text", required: true },
+          { name: "image", label: "画像(任意)", type: "image" },
+          { name: "items", label: "項目(1行に1つ「項目名: 内容」)", type: "textarea", value: "項目1: 内容\n項目2: 内容" }
+        ],
+        run: function (v) {
+          var lines = ["```infobox", v.name];
+          if (v.image) lines.push("画像: " + v.image);
+          String(v.items).split("\n").forEach(function (l) { if (l.trim()) lines.push(l.trim()); });
+          lines.push("```");
+          ed.insert("\n" + lines.join("\n") + "\n");
+        }
       });
     }
   };
@@ -617,7 +712,7 @@ Wiki.register("image-upload", function (api) {
         input.click();
       };
 
-      ed.addButton("画像を追加", "画像を選んでGitHubに追加し、本文に挿入する", function () {
+      ed.addItem("画像", { label: "画像を追加", hint: "画像を選んでGitHubに追加し、本文に挿入する", icon: "add_photo_alternate", run: function () {
         var input = document.createElement("input");
         input.type = "file";
         input.accept = "image/png,image/jpeg,image/gif,image/webp";
@@ -626,7 +721,7 @@ Wiki.register("image-upload", function (api) {
           if (input.files && input.files.length) handle(Array.prototype.slice.call(input.files));
         });
         input.click();
-      });
+      } });
 
       var ta = ed.textarea;
       ta.addEventListener("paste", function (ev) {
@@ -891,10 +986,10 @@ Wiki.register("hero", function (api) {
         show(read());
       });
 
-      ed.addButton("ヒーロー", "「概要」タブで、ページ上部のバナーを設定する", function () {
+      ed.addItem("ページ", { label: "ヒーロー", hint: "「概要」タブで、ページ上部のバナーを設定する", icon: "panorama", run: function () {
         ed.openOverview();
         sec.scrollIntoView({ block: "start" });
-      });
+      } });
     }
   };
 });
@@ -1041,10 +1136,10 @@ Wiki.register("page-background", function (api) {
         show(read());
       });
 
-      ed.addButton("背景", "「概要」タブで、このページの背景を設定する", function () {
+      ed.addItem("ページ", { label: "背景", hint: "「概要」タブで、このページの背景を設定する", icon: "wallpaper", run: function () {
         ed.openOverview();
         sec.scrollIntoView({ block: "start" });
-      });
+      } });
     }
   };
 });

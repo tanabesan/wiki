@@ -619,10 +619,198 @@
   }
 
   // プラグイン(editor フック)に渡す、ツールバーとテキスト操作の道具
+  /* ---------- 編集画面のモーダル(カテゴリのボタンを押すと開く) ---------- */
+  var CAT_ICONS = { "見出し": "title", "文字": "format_bold", "挿入": "add_box", "画像": "image", "ページ": "tune" };
+
+  function mk(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  // フォームの1項目を作る。{ el: 入力欄を含む要素, get: 値を返す関数, input: 入力欄 }
+  function makeField(f, ed) {
+    var wrap = mk("label", "ed-f");
+    wrap.appendChild(mk("span", "ed-f-label", f.label || f.name));
+    var input, get;
+    var type = f.type || "text";
+    if (type === "textarea") {
+      input = mk("textarea");
+      input.rows = f.rows || 4;
+      input.value = f.value || "";
+      get = function () { return input.value; };
+    } else if (type === "select") {
+      input = mk("select");
+      (f.options || []).forEach(function (o) {
+        var op = mk("option", null, o[1]);
+        op.value = o[0];
+        input.appendChild(op);
+      });
+      if (f.value != null) input.value = f.value;
+      get = function () { return input.value; };
+    } else if (type === "checkbox") {
+      wrap.className = "ed-f ed-f-check";
+      input = mk("input");
+      input.type = "checkbox";
+      input.checked = !!f.value;
+      wrap.insertBefore(input, wrap.firstChild);
+      get = function () { return input.checked; };
+    } else {
+      input = mk("input");
+      input.type = type === "number" ? "number" : "text";
+      if (type === "number") { if (f.min != null) input.min = f.min; if (f.max != null) input.max = f.max; }
+      input.value = f.value != null ? f.value : "";
+      if (f.placeholder) input.placeholder = f.placeholder;
+      get = function () { return type === "number" ? Number(input.value) : input.value.trim(); };
+      if (type === "page") {
+        var dl = mk("datalist");
+        dl.id = "ed-dl-" + Math.random().toString(36).slice(2, 8);
+        pages.forEach(function (p) { var op = mk("option"); op.value = p.slug; op.label = p.title; dl.appendChild(op); });
+        input.setAttribute("list", dl.id);
+        wrap.appendChild(dl);
+      }
+    }
+    if (type === "image") {
+      var row = mk("div", "ed-pick");
+      var pick = mk("button", "btn ghost ed-small", "画像を選ぶ");
+      pick.type = "button";
+      pick.addEventListener("click", function () {
+        if (!ed.pickImage) { ed.status("画像を選ぶには、image-upload プラグインが有効で、編集のトークンが設定されている必要があります", true); return; }
+        ed.pickImage(function (path) { input.value = path; });
+      });
+      row.appendChild(input);
+      row.appendChild(pick);
+      wrap.appendChild(row);
+    } else if (type !== "checkbox") {
+      wrap.appendChild(input);
+    }
+    if (f.hint) wrap.appendChild(mk("span", "ed-f-hint", f.hint));
+    return { el: wrap, get: get, input: input };
+  }
+
+  // title: モーダルの見出し、items: 選べる機能の一覧。item = { label, hint, icon, fields, submitLabel, run }
+  function openPicker(title, items, ed) {
+    var back = mk("div", "ed-modal-back");
+    var box = mk("div", "ed-modal");
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-label", title);
+    var head = mk("div", "ed-modal-head");
+    var backBtn = mk("button", "ed-modal-nav", "← 戻る");
+    backBtn.type = "button";
+    backBtn.hidden = true;
+    var ttl = mk("strong", "ed-modal-title", title);
+    var x = mk("button", "ed-modal-x", "×");
+    x.type = "button";
+    x.setAttribute("aria-label", "閉じる");
+    head.appendChild(backBtn);
+    head.appendChild(ttl);
+    head.appendChild(x);
+    var body = mk("div", "ed-modal-body");
+    box.appendChild(head);
+    box.appendChild(body);
+    back.appendChild(box);
+
+    var prevFocus = document.activeElement;
+    function close() {
+      document.removeEventListener("keydown", onKey, true);
+      back.remove();
+      ed.textarea.focus();
+    }
+    function onKey(ev) {
+      if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(); return; }
+      if (ev.key !== "Tab") return;
+      var f = box.querySelectorAll("button:not([hidden]), input, select, textarea");
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+    }
+
+    function showList() {
+      ttl.textContent = title;
+      backBtn.hidden = true;
+      body.textContent = "";
+      var grid = mk("div", "ed-items");
+      items.forEach(function (it) {
+        var b = mk("button", "ed-item");
+        b.type = "button";
+        if (it.icon) b.appendChild(mk("span", "ed-item-ico", "")).innerHTML = icon(it.icon);
+        var t = mk("span", "ed-item-text");
+        t.appendChild(mk("b", null, it.label));
+        if (it.hint) t.appendChild(mk("span", null, it.hint));
+        b.appendChild(t);
+        if (it.fields && it.fields.length) b.appendChild(mk("span", "ed-item-more", "›"));
+        b.addEventListener("click", function () {
+          if (it.fields && it.fields.length) { showForm(it); return; }
+          close();
+          safeRun(it, {});
+        });
+        grid.appendChild(b);
+      });
+      body.appendChild(grid);
+      var firstBtn = grid.querySelector("button");
+      if (firstBtn) firstBtn.focus();
+    }
+
+    function safeRun(it, values) {
+      try { it.run(values); } catch (err) { warn("エディタの機能「" + it.label + "」でエラー:", err); ed.status("「" + it.label + "」を実行できませんでした", true); }
+    }
+
+    function showForm(it) {
+      ttl.textContent = it.label;
+      backBtn.hidden = items.length < 2;
+      body.textContent = "";
+      var form = mk("form", "ed-form");
+      if (it.hint) form.appendChild(mk("p", "ed-note", it.hint));
+      var fs = it.fields.map(function (f) { var o = makeField(f, ed); o.def = f; form.appendChild(o.el); return o; });
+      var err = mk("p", "status err");
+      err.hidden = true;
+      var bar = mk("div", "ed-form-bar");
+      var cancel = mk("button", "btn ghost", "キャンセル");
+      cancel.type = "button";
+      var ok = mk("button", "btn", it.submitLabel || "挿入する");
+      ok.type = "submit";
+      bar.appendChild(cancel);
+      bar.appendChild(ok);
+      form.appendChild(err);
+      form.appendChild(bar);
+      cancel.addEventListener("click", function () { if (items.length < 2) close(); else showList(); });
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var values = {};
+        for (var i = 0; i < fs.length; i++) {
+          var v = fs[i].get(), d = fs[i].def;
+          if (d.required && (v === "" || (typeof v === "number" && isNaN(v)))) {
+            err.textContent = "「" + (d.label || d.name) + "」を入力してください";
+            err.hidden = false;
+            fs[i].input.focus();
+            return;
+          }
+          values[d.name] = v;
+        }
+        close();
+        safeRun(it, values);
+      });
+      body.appendChild(form);
+      var inp = form.querySelector("input:not([type=checkbox]), textarea, select");
+      if (inp) inp.focus();
+    }
+
+    backBtn.addEventListener("click", showList);
+    x.addEventListener("click", close);
+    back.addEventListener("mousedown", function (ev) { if (ev.target === back) close(); });
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(back);
+    if (items.length === 1 && items[0].fields && items[0].fields.length) showForm(items[0]); else showList();
+  }
+
   function makeEditorApi(ta, savedCbs, ctrl) {
     var bar = $("ed-toolbar");
+    var cats = {}, self;
     function fire() { ta.dispatchEvent(new Event("input")); }
-    return {
+    return (self = {
       textarea: ta,
       // 保存に成功したあとに呼ぶ関数を登録する(下書きの削除など)
       onSaved: function (fn) { savedCbs.push(fn); },
@@ -653,6 +841,32 @@
         var st = $("ed-status");
         if (st) { st.textContent = msg; st.className = "status" + (isErr ? " err" : ""); }
       },
+      // ツールバーに、カテゴリのボタンを作って、その中の機能を足す。ボタンを押すとモーダルが開き、機能を選べる。
+      // item = { label, hint, icon, fields: [入力欄…], submitLabel, run(values) }
+      //   fields があるときは、機能を選ぶと入力フォームが出て、「挿入する」を押すと run(入力した値) が呼ばれる
+      //   fields の1項目: { name, label, type: "text"|"textarea"|"number"|"select"|"checkbox"|"page"|"image", value, placeholder, required, hint, options: [[値, 表示]…] }
+      addItem: function (category, item) {
+        var c = cats[category];
+        if (!c) {
+          c = cats[category] = { items: [] };
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "tb tb-cat";
+          b.setAttribute("aria-haspopup", "dialog");
+          b.innerHTML = icon(CAT_ICONS[category] || "extension") + "<span></span><span class=\"caret\" aria-hidden=\"true\">▾</span>";
+          b.querySelector("span:not(.ms):not(.caret)").textContent = category;
+          b.title = category + "の機能を選ぶ";
+          b.addEventListener("click", function () { openPicker(category, c.items, self); });
+          c.btn = b;
+          bar.appendChild(b);
+          // カテゴリのボタンは、決まった順(見出し→文字→挿入→画像→ページ→その他)に並べる
+          var rank = function (n) { var i = Object.keys(CAT_ICONS).indexOf(n); return i < 0 ? 99 : i; };
+          var order = Object.keys(cats).sort(function (a, b2) { return rank(a) - rank(b2); });
+          var anchor = bar.querySelector(".tb:not(.tb-cat)");
+          order.forEach(function (n) { bar.insertBefore(cats[n].btn, anchor); });
+        }
+        c.items.push(item);
+      },
       addButton: function (label, title, onclick) {
         var b = document.createElement("button");
         b.type = "button";
@@ -676,7 +890,7 @@
         ta.setSelectionRange(s + before.length, s + before.length + sel.length);
         fire();
       }
-    };
+    });
   }
 
   function buildEditor(box, o) {
