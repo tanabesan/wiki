@@ -542,7 +542,8 @@
     box.classList.add("has-hero");
     var t = hero.querySelector(".hero-title");
     var h1 = box.querySelector("h1");
-    if (h1 && t && t.textContent.trim() === page.title.trim()) h1.classList.add("sr-only");
+    var norm = function (x) { return String(x).replace(/\s+/g, "").toLowerCase(); };
+    if (h1 && t && norm(t.textContent) === norm(page.title)) h1.classList.add("sr-only"); // 大文字小文字・空白の違いは同じ名前とみなす
   }
 
   async function viewPage(box, page) {
